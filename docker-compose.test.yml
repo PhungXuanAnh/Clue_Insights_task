@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  test-app:
+    build:
+      context: .
+      args:
+        - ENVIRONMENT=test
+    ports:
+      - "5001:5000"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=testing
+      - SECRET_KEY=test_secret_key
+      - DEBUG=True
+      - DB_ENGINE=mysql+pymysql
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_HOST=test-db
+      - DB_PORT=3306
+      - DB_NAME=subscription_test_db
+      - JWT_SECRET_KEY=test_jwt_secret_key
+      - TEST_CASE=${TEST_CASE:-""}
+    depends_on:
+      - test-db
+    command: >
+      sh -c "python -m pytest ${TEST_CASE:-tests/}"
+    networks:
+      - test-network
+
+  test-db:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=subscription_test_db
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    volumes:
+      - test_mysql_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test_mysql_data: 

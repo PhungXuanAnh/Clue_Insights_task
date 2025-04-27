@@ -1,0 +1,8 @@
+# Production environment requirements
+-r base.txt
+
+# Production tools
+boto3==1.28.3          # For AWS integration
+gunicorn==21.2.0       # Production WSGI server
+python-decouple==3.8   # For secure configuration
+uWSGI==2.0.23          # Alternative WSGI server option 

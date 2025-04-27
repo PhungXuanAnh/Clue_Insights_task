@@ -1,0 +1,9 @@
+# Development environment requirements
+-r base.txt
+
+# Development tools
+black==23.7.0
+autopep8==2.0.2
+pytest==7.4.0
+pytest-flask==1.2.0
+pytest-cov==4.1.0 

@@ -1,0 +1,44 @@
+# Git related
+.git
+.gitignore
+
+# Python related
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.env
+.venv/
+venv/
+ENV/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing related
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# IDE related
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation related
+docs/
+README.md
+
+# Docker related
+# NOTE: Don't exclude Dockerfile or docker-compose.yml from the build context
+.dockerignore
+
+# Other
+.DS_Store
+node_modules/
+tmp/
+temp/ 
