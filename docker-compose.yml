@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build:
@@ -25,7 +23,7 @@ services:
     depends_on:
       - db
     command: >
-      sh -c "flask run --host=0.0.0.0"
+      sh -c "flask run --host=0.0.0.0 --debug"
     networks:
       - app-network
     restart: unless-stopped

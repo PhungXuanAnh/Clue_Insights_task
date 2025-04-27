@@ -7,6 +7,7 @@ import pytest
 from dotenv import load_dotenv
 from flask import Flask
 from flask.testing import FlaskClient
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from app import create_app, db
 
@@ -68,16 +69,18 @@ def db_session(app):
         connection = db.engine.connect()
         transaction = connection.begin()
         
-        # Create a session with the connection
-        session = db.create_scoped_session(
-            options={"bind": connection, "binds": {}}
-        )
+        # Create a session using sessionmaker and scoped_session
+        session_factory = sessionmaker(bind=connection)
+        session = scoped_session(session_factory)
         
+        # Override the default session with our test session
+        old_session = db.session
         db.session = session
         
         yield session
         
-        # Roll back the transaction
+        # Roll back the transaction and restore the original session
+        db.session = old_session
         transaction.rollback()
         connection.close()
         session.remove() 
