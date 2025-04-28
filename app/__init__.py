@@ -3,10 +3,11 @@ Subscription Management API Application Factory.
 """
 import importlib
 import os
+from datetime import datetime
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify
-from flask_jwt_extended import JWTManager
+from flask_jwt_extended import JWTManager, get_jwt
 from flask_migrate import Migrate
 from flask_restx import Api
 from flask_sqlalchemy import SQLAlchemy
@@ -86,23 +87,56 @@ def create_app(config_name=None):
     db.init_app(app)
     jwt.init_app(app)
     
+    # Configure JWT token blacklist if enabled
+    if app.config.get('JWT_BLACKLIST_ENABLED'):
+        # Import token blacklist model
+        from app.models.token_blacklist import TokenBlacklist
+        
+        @jwt.token_in_blocklist_loader
+        def check_if_token_revoked(jwt_header, jwt_payload):
+            """
+            Check if a token is revoked.
+            """
+            jti = jwt_payload["jti"]
+            return TokenBlacklist.is_token_revoked(jti)
+            
+        @jwt.revoked_token_loader
+        def revoked_token_callback(jwt_header, jwt_payload):
+            """
+            Return a response when a revoked token is used.
+            """
+            return jsonify({
+                'status': 401,
+                'message': 'Token has been revoked'
+            }), 401
+    
     # Initialize Flask-Migrate with app and database
     migrate.init_app(app, db)
     
     # Import models to ensure they're registered with SQLAlchemy
-    from app.models import User, SubscriptionPlan, UserSubscription
-    
-    # Create API
+    from app.models import SubscriptionPlan, TokenBlacklist, User, UserSubscription
+
+    # Create API with additional configuration for Swagger UI documentation
     api = Api(
         app,
-        version="1.0",
-        title="Subscription Management API",
-        description="A RESTful API for managing user subscriptions",
+        version=app.config.get("API_VERSION", "1.0"),
+        title=app.config.get("API_TITLE", "Subscription Management API"),
+        description=app.config.get("API_DESCRIPTION", "A RESTful API for managing user subscriptions"),
         doc="/api/docs",
+        authorizations={
+            'Bearer Auth': {
+                'type': 'apiKey',
+                'in': 'header',
+                'name': 'Authorization',
+                'description': 'Enter: **Bearer &lt;JWT&gt;**'
+            },
+        },
+        security='Bearer Auth'  # Use Bearer Auth by default for all endpoints
     )
     
     # Register blueprints and namespaces here
     from app.api.auth import auth_ns
+
     # from app.api.subscriptions import subscription_ns
     api.add_namespace(auth_ns, path='/api/auth')
     # api.add_namespace(subscription_ns)

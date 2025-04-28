@@ -3,6 +3,8 @@ Integration tests for authentication endpoints.
 """
 import json
 import pytest
+
+from app.models.token_blacklist import TokenBlacklist
 from app.models.user import User
 
 
@@ -308,4 +310,60 @@ def test_token_refresh_missing_token(client):
     response = client.post('/api/auth/refresh')
     
     # Flask-JWT-Extended returns 401 for missing token
-    assert response.status_code == 401 
+    assert response.status_code == 401
+
+
+def test_user_logout_success(client, db_session):
+    """Test successful user logout."""
+    # Create a test user
+    user = User(username='logoutuser', email='logout@example.com', password='password123')
+    db_session.add(user)
+    db_session.commit()
+    
+    # Login to get a token
+    login_data = {
+        'username': 'logoutuser',
+        'password': 'password123'
+    }
+    
+    login_response = client.post(
+        '/api/auth/login',
+        data=json.dumps(login_data),
+        content_type='application/json'
+    )
+    
+    assert login_response.status_code == 200
+    login_data = json.loads(login_response.data)
+    access_token = login_data['access_token']
+    
+    # Try to logout
+    response = client.post(
+        '/api/auth/logout',
+        headers={'Authorization': f'Bearer {access_token}'}
+    )
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'message' in data
+    assert 'Logout successful' in data['message']
+    
+    # Check if token is blacklisted or logout was successful
+    # This depends on the environment configuration
+    # If blacklisting is enabled, the token should be in the blacklist
+    from flask import current_app
+    with client.application.app_context():
+        if current_app.config.get('JWT_BLACKLIST_ENABLED', False):
+            # Check that token is blacklisted
+            token = TokenBlacklist.query.first()
+            assert token is not None
+
+
+def test_user_logout_unauthorized(client):
+    """Test user logout with invalid token."""
+    response = client.post(
+        '/api/auth/logout',
+        headers={'Authorization': 'Bearer invalid_token'}
+    )
+    
+    # JWT returns 422 for malformed tokens
+    assert response.status_code == 422 

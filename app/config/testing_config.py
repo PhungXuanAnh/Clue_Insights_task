@@ -21,6 +21,10 @@ class TestingConfig(BaseConfig):
     # Use faster hashing for tests
     BCRYPT_LOG_ROUNDS = 4
     
-    # Shorter token expiration for testing
+    # JWT settings for testing
     JWT_ACCESS_TOKEN_EXPIRES = 300  # 5 minutes
-    JWT_REFRESH_TOKEN_EXPIRES = 1800  # 30 minutes 
+    JWT_REFRESH_TOKEN_EXPIRES = 1800  # 30 minutes
+    JWT_ERROR_MESSAGE_KEY = "message"
+    JWT_BLACKLIST_ENABLED = False
+    # Use a predictable key for testing
+    JWT_SECRET_KEY = "test-jwt-secret-key-for-testing-only" 

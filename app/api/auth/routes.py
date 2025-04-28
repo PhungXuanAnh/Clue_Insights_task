@@ -1,10 +1,13 @@
 """
 Authentication routes.
 """
-from flask import request
+from datetime import datetime
+
+from flask import current_app, request
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
+    get_jwt,
     get_jwt_identity,
     jwt_required,
 )
@@ -12,6 +15,7 @@ from flask_restx import Resource, fields
 from sqlalchemy.exc import IntegrityError
 
 from app import db
+from app.models.token_blacklist import TokenBlacklist
 from app.models.user import User
 
 from . import auth_ns
@@ -49,6 +53,11 @@ user_model = auth_ns.model('User', {
 # Define the refresh token model for documentation
 refresh_token_model = auth_ns.model('RefreshToken', {
     'access_token': fields.String(description='New JWT access token')
+})
+
+# Define the logout response model for documentation
+logout_model = auth_ns.model('LogoutResponse', {
+    'message': fields.String(description='Logout success message')
 })
 
 @auth_ns.route('/register')
@@ -172,4 +181,42 @@ class TokenRefresh(Resource):
         # Return the new access token
         return {
             'access_token': new_access_token
-        }, 200 
+        }, 200
+
+@auth_ns.route('/logout')
+class UserLogout(Resource):
+    """
+    User logout endpoint.
+    """
+    @auth_ns.doc('logout_user')
+    @jwt_required()
+    @auth_ns.response(200, 'Logout successful', logout_model)
+    @auth_ns.response(401, 'Invalid token')
+    def post(self):
+        """
+        Revoke the current JWT token.
+        """
+        # Check if blacklist is enabled
+        if not current_app.config.get('JWT_BLACKLIST_ENABLED', False):
+            return {'message': 'Logout successful'}, 200
+            
+        # Get JWT metadata
+        token_data = get_jwt()
+        jti = token_data['jti']
+        token_type = "access"
+        user_id = get_jwt_identity()
+        
+        # Calculate expiration time
+        expires_at = datetime.fromtimestamp(token_data['exp'])
+        
+        # Add token to blacklist
+        try:
+            TokenBlacklist.add_token_to_blacklist(
+                jti=jti,
+                token_type=token_type,
+                user_id=int(user_id),
+                expires_at=expires_at
+            )
+            return {'message': 'Successfully logged out'}, 200
+        except Exception as e:
+            return {'message': f'Error during logout: {str(e)}'}, 500 

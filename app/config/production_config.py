@@ -14,7 +14,16 @@ class ProductionConfig(BaseConfig):
     
     # Use environment variables with no defaults for production
     SECRET_KEY = os.getenv("SECRET_KEY")
+    
+    # JWT settings for production - more secure settings
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600))  # 1 hour default
+    JWT_REFRESH_TOKEN_EXPIRES = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", 604800))  # 7 days default
+    JWT_ERROR_MESSAGE_KEY = "message"
+    JWT_BLACKLIST_ENABLED = True  # Enable blacklist in production
+    JWT_BLACKLIST_TOKEN_CHECKS = ["access", "refresh"]  # Check both token types
+    JWT_COOKIE_SECURE = True  # Only send cookies over HTTPS
+    JWT_COOKIE_CSRF_PROTECT = True  # Enable CSRF protection
     
     # Database settings from environment with no defaults
     DB_HOST = os.getenv("DB_HOST")
