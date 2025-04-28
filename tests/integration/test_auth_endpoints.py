@@ -141,4 +141,118 @@ def test_user_registration_duplicate_email(client, db_session):
     
     assert response.status_code == 409
     data = json.loads(response.data)
-    assert 'Username or email already exists' in data['message'] 
+    assert 'Username or email already exists' in data['message']
+
+
+def test_user_login_success_with_username(client, db_session):
+    """Test successful user login using username."""
+    # Create a test user
+    user = User(username='loginuser', email='login@example.com', password='password123')
+    db_session.add(user)
+    db_session.commit()
+    
+    # Try to login
+    login_data = {
+        'username': 'loginuser',
+        'password': 'password123'
+    }
+    
+    response = client.post(
+        '/api/auth/login',
+        data=json.dumps(login_data),
+        content_type='application/json'
+    )
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'access_token' in data
+    assert 'refresh_token' in data
+    assert data['user_id'] == user.id
+    assert data['username'] == 'loginuser'
+
+
+def test_user_login_success_with_email(client, db_session):
+    """Test successful user login using email."""
+    # Create a test user
+    user = User(username='emailuser', email='email_login@example.com', password='password123')
+    db_session.add(user)
+    db_session.commit()
+    
+    # Try to login with email instead of username
+    login_data = {
+        'username': 'email_login@example.com',
+        'password': 'password123'
+    }
+    
+    response = client.post(
+        '/api/auth/login',
+        data=json.dumps(login_data),
+        content_type='application/json'
+    )
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'access_token' in data
+    assert 'refresh_token' in data
+    assert data['user_id'] == user.id
+    assert data['username'] == 'emailuser'
+
+
+def test_user_login_invalid_credentials(client, db_session):
+    """Test login with invalid credentials."""
+    # Create a test user
+    user = User(username='testuser', email='test@example.com', password='password123')
+    db_session.add(user)
+    db_session.commit()
+    
+    # Try to login with wrong password
+    login_data = {
+        'username': 'testuser',
+        'password': 'wrongpassword'
+    }
+    
+    response = client.post(
+        '/api/auth/login',
+        data=json.dumps(login_data),
+        content_type='application/json'
+    )
+    
+    assert response.status_code == 401
+    data = json.loads(response.data)
+    assert 'Invalid username/email or password' in data['message']
+
+
+def test_user_login_nonexistent_user(client):
+    """Test login with a username that doesn't exist."""
+    login_data = {
+        'username': 'nonexistentuser',
+        'password': 'password123'
+    }
+    
+    response = client.post(
+        '/api/auth/login',
+        data=json.dumps(login_data),
+        content_type='application/json'
+    )
+    
+    assert response.status_code == 401
+    data = json.loads(response.data)
+    assert 'Invalid username/email or password' in data['message']
+
+
+def test_user_login_missing_fields(client):
+    """Test login with missing required fields."""
+    # Missing password
+    login_data = {
+        'username': 'testuser'
+    }
+    
+    response = client.post(
+        '/api/auth/login',
+        data=json.dumps(login_data),
+        content_type='application/json'
+    )
+    
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert 'Missing required fields' in data['message'] 

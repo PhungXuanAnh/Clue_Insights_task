@@ -4,6 +4,7 @@ Authentication routes.
 from flask import request
 from flask_restx import Resource, fields
 from sqlalchemy.exc import IntegrityError
+from flask_jwt_extended import create_access_token, create_refresh_token
 
 from app import db
 from app.models.user import User
@@ -14,6 +15,20 @@ register_model = auth_ns.model('UserRegistration', {
     'username': fields.String(required=True, description='User username'),
     'email': fields.String(required=True, description='User email address'),
     'password': fields.String(required=True, description='User password')
+})
+
+# Define the login model for documentation and validation
+login_model = auth_ns.model('UserLogin', {
+    'username': fields.String(required=True, description='User username or email'),
+    'password': fields.String(required=True, description='User password')
+})
+
+# Define the token response model for documentation
+token_model = auth_ns.model('TokenResponse', {
+    'access_token': fields.String(description='JWT access token'),
+    'refresh_token': fields.String(description='JWT refresh token'),
+    'user_id': fields.Integer(description='User identifier'),
+    'username': fields.String(description='User username')
 })
 
 # Define the user response model for documentation
@@ -79,4 +94,45 @@ class UserRegistration(Resource):
             return {'message': 'Username or email already exists'}, 409
         except Exception as e:
             db.session.rollback()
-            return {'message': f'Error creating user: {str(e)}'}, 500 
+            return {'message': f'Error creating user: {str(e)}'}, 500
+
+@auth_ns.route('/login')
+class UserLogin(Resource):
+    """
+    User login endpoint.
+    """
+    @auth_ns.doc('login_user')
+    @auth_ns.expect(login_model)
+    @auth_ns.response(200, 'Login successful', token_model)
+    @auth_ns.response(400, 'Validation error')
+    @auth_ns.response(401, 'Invalid credentials')
+    def post(self):
+        """
+        Authenticate a user and generate JWT tokens.
+        """
+        data = request.json
+        
+        # Validate required fields
+        if not all(k in data for k in ('username', 'password')):
+            return {'message': 'Missing required fields'}, 400
+            
+        # Find user by username or email
+        user = User.query.filter(
+            (User.username == data['username']) | (User.email == data['username'])
+        ).first()
+        
+        # Check if user exists and password is correct
+        if not user or not user.check_password(data['password']):
+            return {'message': 'Invalid username/email or password'}, 401
+            
+        # Generate access and refresh tokens
+        access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
+        
+        # Return tokens and user info
+        return {
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'user_id': user.id,
+            'username': user.username
+        }, 200 
