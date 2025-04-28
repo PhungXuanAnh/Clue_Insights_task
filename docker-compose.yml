@@ -39,7 +39,6 @@ services:
       - MYSQL_PASSWORD=password
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - app-network
     restart: unless-stopped

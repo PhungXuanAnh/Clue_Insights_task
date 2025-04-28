@@ -23,7 +23,11 @@ run:
 	@echo "Starting development server..."
 	docker compose up
 
-# Run tests
+test-build-image:
+	@echo "Building test image..."
+	docker compose -f docker-compose.test.yml build
+	@echo "Test image built successfully."
+
 test:
 	@echo "Running tests..."
 	@echo "TEST_CASE = ${TEST_CASE}"
@@ -31,10 +35,21 @@ test:
 	# Start test database first and wait for it to be ready
 	docker compose -f docker-compose.test.yml up -d test-db
 	@echo "Waiting for test database to be ready..."
-	@sleep 10
+	@MAX_RETRIES=30; \
+	RETRIES=0; \
+	until docker exec clue_insights_task-test-db-1 mysqladmin ping -h localhost -u user -ppassword --silent || [ $$RETRIES -eq $$MAX_RETRIES ]; do \
+		echo "Waiting for database to be ready... $$RETRIES/$$MAX_RETRIES"; \
+		sleep 1; \
+		RETRIES=$$((RETRIES+1)); \
+	done; \
+	if [ $$RETRIES -eq $$MAX_RETRIES ]; then \
+		echo "Database did not become ready in time"; \
+		exit 1; \
+	fi; \
+	echo "Database is ready!"
 	
 	# Then start test app and run tests
-	TEST_CASE=${TEST_CASE} docker compose -f docker-compose.test.yml up --abort-on-container-exit test-app
+	TEST_CASE=${TEST_CASE} docker compose -f docker-compose.test.yml up --abort-on-container-exit --menu=false test-app
 	
 	# Clean up after tests
 	@echo "Tests completed. Cleaning up..."

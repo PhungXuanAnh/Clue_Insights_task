@@ -24,7 +24,7 @@ services:
     depends_on:
       - test-db
     command: >
-      sh -c "python -m pytest ${TEST_CASE:-tests/}"
+      sh -c "python -m pytest -v ${TEST_CASE:-tests/}"
     networks:
       - test-network
 
@@ -37,9 +37,6 @@ services:
       - MYSQL_DATABASE=subscription_test_db
       - MYSQL_USER=user
       - MYSQL_PASSWORD=password
-    volumes:
-      - test_mysql_data:/var/lib/mysql
-      - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - test-network
     healthcheck:
@@ -51,6 +48,3 @@ services:
 networks:
   test-network:
     driver: bridge
-
-volumes:
-  test_mysql_data: 

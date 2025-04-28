@@ -3,7 +3,6 @@ Integration tests for authentication endpoints.
 """
 import json
 import pytest
-
 from app.models.user import User
 
 
