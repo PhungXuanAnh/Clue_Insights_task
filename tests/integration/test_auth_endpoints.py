@@ -254,4 +254,58 @@ def test_user_login_missing_fields(client):
     
     assert response.status_code == 400
     data = json.loads(response.data)
-    assert 'Missing required fields' in data['message'] 
+    assert 'Missing required fields' in data['message']
+
+
+def test_token_refresh_success(client, db_session):
+    """Test successful token refresh."""
+    # Create a test user
+    user = User(username='refreshuser', email='refresh@example.com', password='password123')
+    db_session.add(user)
+    db_session.commit()
+    
+    # Login to get refresh token
+    login_data = {
+        'username': 'refreshuser',
+        'password': 'password123'
+    }
+    
+    login_response = client.post(
+        '/api/auth/login',
+        data=json.dumps(login_data),
+        content_type='application/json'
+    )
+    
+    login_data = json.loads(login_response.data)
+    refresh_token = login_data['refresh_token']
+    
+    # Use refresh token to get new access token
+    response = client.post(
+        '/api/auth/refresh',
+        headers={'Authorization': f'Bearer {refresh_token}'}
+    )
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'access_token' in data
+
+
+def test_token_refresh_invalid_token(client):
+    """Test token refresh with invalid token."""
+    # Use an invalid token
+    response = client.post(
+        '/api/auth/refresh',
+        headers={'Authorization': 'Bearer invalid_token'}
+    )
+    
+    # Flask-JWT-Extended returns 422 for invalid tokens, not 401
+    assert response.status_code == 422
+
+
+def test_token_refresh_missing_token(client):
+    """Test token refresh without providing a token."""
+    # No Authorization header
+    response = client.post('/api/auth/refresh')
+    
+    # Flask-JWT-Extended returns 401 for missing token
+    assert response.status_code == 401 

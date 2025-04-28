@@ -2,12 +2,18 @@
 Authentication routes.
 """
 from flask import request
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    get_jwt_identity,
+    jwt_required,
+)
 from flask_restx import Resource, fields
 from sqlalchemy.exc import IntegrityError
-from flask_jwt_extended import create_access_token, create_refresh_token
 
 from app import db
 from app.models.user import User
+
 from . import auth_ns
 
 # Define the user registration model for documentation and validation
@@ -38,6 +44,11 @@ user_model = auth_ns.model('User', {
     'email': fields.String(description='User email address'),
     'created_at': fields.DateTime(description='Creation timestamp'),
     'updated_at': fields.DateTime(description='Last update timestamp')
+})
+
+# Define the refresh token model for documentation
+refresh_token_model = auth_ns.model('RefreshToken', {
+    'access_token': fields.String(description='New JWT access token')
 })
 
 @auth_ns.route('/register')
@@ -126,8 +137,9 @@ class UserLogin(Resource):
             return {'message': 'Invalid username/email or password'}, 401
             
         # Generate access and refresh tokens
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        # Convert user ID to string to ensure consistency
+        access_token = create_access_token(identity=str(user.id))
+        refresh_token = create_refresh_token(identity=str(user.id))
         
         # Return tokens and user info
         return {
@@ -135,4 +147,29 @@ class UserLogin(Resource):
             'refresh_token': refresh_token,
             'user_id': user.id,
             'username': user.username
+        }, 200
+
+@auth_ns.route('/refresh')
+class TokenRefresh(Resource):
+    """
+    Token refresh endpoint.
+    """
+    @auth_ns.doc('refresh_token')
+    @jwt_required(refresh=True)
+    @auth_ns.response(200, 'Token refresh successful', refresh_token_model)
+    @auth_ns.response(401, 'Invalid refresh token')
+    def post(self):
+        """
+        Generate a new access token using a refresh token.
+        """
+        # Get the identity from the refresh token
+        current_user_id = get_jwt_identity()
+        
+        # Generate a new access token
+        # Convert to string if it's an integer (user ID)
+        new_access_token = create_access_token(identity=str(current_user_id))
+        
+        # Return the new access token
+        return {
+            'access_token': new_access_token
         }, 200 
