@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-from app import create_app, db
+from app import create_app
 
 
 @pytest.fixture(scope="session")
@@ -33,6 +33,8 @@ def app():
     
     # Use the app context for the duration of the test
     with app.app_context():
+        from app import db
+        
         max_attempts = 5
         attempt = 0
         connection_successful = False
@@ -105,6 +107,8 @@ def db_session(app):
         SQLAlchemy session: A database session for testing.
     """
     with app.app_context():
+        from app import db
+        
         connection = db.engine.connect()
         transaction = connection.begin()
         
@@ -122,3 +126,18 @@ def db_session(app):
         if transaction.is_active:
             transaction.rollback()
         connection.close()
+
+
+@pytest.fixture(scope="function")
+def db(app):
+    """
+    Fixture for the SQLAlchemy database object.
+    
+    Args:
+        app: The Flask application fixture.
+    
+    Returns:
+        SQLAlchemy db: The database object for testing.
+    """
+    from app import db as _db
+    return _db

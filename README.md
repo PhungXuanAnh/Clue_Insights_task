@@ -113,6 +113,43 @@ For test coverage:
 pytest --cov=app tests/
 ```
 
+## Sample Data Creation
+
+To create sample subscription plans for testing and development:
+
+```bash
+# Copy the sample data creation script to the container
+docker cp create_sample_plans.py clue_insights_task-app-1:/app/
+
+# Run the script inside the container
+docker exec -it clue_insights_task-app-1 python /app/create_sample_plans.py
+```
+
+This will create the following subscription plans if they don't already exist:
+- Free Plan (monthly, $0)
+- Basic Plan (monthly, $9.99)
+- Pro Plan (monthly, $29.99)
+- Basic Plan (Annual, $99.99)
+- Pro Plan (Annual, $299.99)
+
+You can verify the created plans by accessing the API endpoint:
+```
+curl -X GET "http://localhost:5000/api/plans/" -H "accept: application/json" | jq
+```
+
+To create an admin user for testing:
+```bash
+# Copy the admin user creation script to the container
+docker cp create_admin.py clue_insights_task-app-1:/app/
+
+# Run the script inside the container
+docker exec -it clue_insights_task-app-1 python /app/create_admin.py
+```
+
+The default admin credentials are:
+- Username: admin
+- Password: admin123
+
 ## Project Structure
 
 ```

@@ -38,7 +38,8 @@ token_model = auth_ns.model('TokenResponse', {
     'access_token': fields.String(description='JWT access token'),
     'refresh_token': fields.String(description='JWT refresh token'),
     'user_id': fields.Integer(description='User identifier'),
-    'username': fields.String(description='User username')
+    'username': fields.String(description='User username'),
+    'is_admin': fields.Boolean(description='Whether the user has admin privileges')
 })
 
 # Define the user response model for documentation
@@ -46,6 +47,7 @@ user_model = auth_ns.model('User', {
     'id': fields.Integer(description='User identifier'),
     'username': fields.String(description='User username'),
     'email': fields.String(description='User email address'),
+    'is_admin': fields.Boolean(description='Whether the user has admin privileges'),
     'created_at': fields.DateTime(description='Creation timestamp'),
     'updated_at': fields.DateTime(description='Last update timestamp')
 })
@@ -146,16 +148,26 @@ class UserLogin(Resource):
             return {'message': 'Invalid username/email or password'}, 401
             
         # Generate access and refresh tokens
-        # Convert user ID to string to ensure consistency
-        access_token = create_access_token(identity=str(user.id))
-        refresh_token = create_refresh_token(identity=str(user.id))
+        # Use custom claims to include admin status
+        additional_claims = {"is_admin": user.is_admin}
+        
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims=additional_claims
+        )
+        
+        refresh_token = create_refresh_token(
+            identity=str(user.id),
+            additional_claims=additional_claims
+        )
         
         # Return tokens and user info
         return {
             'access_token': access_token,
             'refresh_token': refresh_token,
             'user_id': user.id,
-            'username': user.username
+            'username': user.username,
+            'is_admin': user.is_admin
         }, 200
 
 @auth_ns.route('/refresh')
@@ -172,11 +184,10 @@ class TokenRefresh(Resource):
         Generate a new access token using a refresh token.
         """
         # Get the identity from the refresh token
-        current_user_id = get_jwt_identity()
+        current_user = get_jwt_identity()
         
-        # Generate a new access token
-        # Convert to string if it's an integer (user ID)
-        new_access_token = create_access_token(identity=str(current_user_id))
+        # Generate a new access token with the same claims
+        new_access_token = create_access_token(identity=current_user)
         
         # Return the new access token
         return {
