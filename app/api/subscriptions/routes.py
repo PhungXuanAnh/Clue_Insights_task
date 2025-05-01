@@ -2,7 +2,7 @@
 Routes for subscription plans and user subscriptions.
 """
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from http import HTTPStatus
 
 from flask import current_app, request
@@ -15,7 +15,8 @@ from app.models.subscription_plan import (
     SubscriptionInterval,
     SubscriptionPlan,
 )
-from app.models.user_subscription import SubscriptionStatus, UserSubscription
+from app.models.user import User
+from app.models.user_subscription import PaymentStatus, SubscriptionStatus, UserSubscription
 from app.utils.auth import admin_required
 
 from . import plan_ns, subscription_ns
@@ -78,6 +79,35 @@ plan_input_model = plan_ns.model('PlanInput', {
     'max_users': fields.Integer(description='Maximum number of users allowed'),
     'parent_id': fields.Integer(description='Parent plan ID'),
     'sort_order': fields.Integer(description='Display order', default=0),
+})
+
+# Define the user subscription model for API
+subscription_model = subscription_ns.model('UserSubscription', {
+    'id': fields.Integer(description='Subscription ID'),
+    'user_id': fields.Integer(description='User ID'),
+    'plan_id': fields.Integer(description='Plan ID'),
+    'status': fields.String(description='Subscription status', 
+                           enum=[s.value for s in SubscriptionStatus]),
+    'start_date': fields.DateTime(description='Start date'),
+    'end_date': fields.DateTime(description='End date'),
+    'trial_end_date': fields.DateTime(description='Trial end date'),
+    'canceled_at': fields.DateTime(description='Cancellation date'),
+    'current_period_start': fields.DateTime(description='Current period start'),
+    'current_period_end': fields.DateTime(description='Current period end'),
+    'payment_status': fields.String(description='Payment status'),
+    'quantity': fields.Integer(description='Quantity'),
+    'cancel_at_period_end': fields.Boolean(description='Cancel at period end'),
+    'auto_renew': fields.Boolean(description='Auto renew'),
+    'created_at': fields.DateTime(description='Creation date'),
+    'updated_at': fields.DateTime(description='Last update date'),
+})
+
+# Input model for creating a subscription
+subscription_input_model = subscription_ns.model('SubscriptionInput', {
+    'plan_id': fields.Integer(required=True, description='Plan ID to subscribe to'),
+    'quantity': fields.Integer(description='Quantity (for seat-based plans)', default=1),
+    'auto_renew': fields.Boolean(description='Whether to auto-renew the subscription', default=True),
+    'trial_days': fields.Integer(description='Number of trial days (if applicable)', default=0)
 })
 
 # API routes for subscription plans
@@ -250,4 +280,85 @@ class PlanStatuses(Resource):
                 'value': status.value,
                 'name': status.name
             })
-        return statuses 
+        return statuses
+
+
+# API routes for user subscriptions
+@subscription_ns.route('/')
+class UserSubscriptionList(Resource):
+    """Resource for user subscription operations"""
+    
+    @subscription_ns.doc('create_subscription')
+    @subscription_ns.expect(subscription_input_model)
+    @subscription_ns.marshal_with(subscription_model, code=201)
+    @subscription_ns.response(400, 'Invalid plan or user already has an active subscription')
+    @subscription_ns.response(404, 'Plan not found')
+    @jwt_required()
+    def post(self):
+        """Subscribe to a plan"""
+        user_id = get_jwt_identity()
+        data = request.json
+        
+        # Check if plan exists and is active
+        plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
+        if plan.status != PlanStatus.ACTIVE.value:
+            subscription_ns.abort(400, f"Cannot subscribe to an inactive plan")
+        
+        # Check if user exists
+        user = User.query.get_or_404(user_id)
+        
+        # Check if user already has an active subscription
+        existing_subscription = UserSubscription.query.filter_by(
+            user_id=user_id,
+            status=SubscriptionStatus.ACTIVE.value
+        ).first()
+        
+        if existing_subscription:
+            subscription_ns.abort(400, f"User already has an active subscription. Please cancel or upgrade it instead.")
+        
+        # Calculate subscription dates
+        now = datetime.utcnow()
+        start_date = now
+        current_period_start = now
+        
+        # Calculate end date based on plan duration
+        if plan.duration_months:
+            # Add months to current date
+            month = now.month - 1 + plan.duration_months
+            year = now.year + month // 12
+            month = month % 12 + 1
+            end_date = datetime(year, month, min(now.day, 28), now.hour, now.minute, now.second)
+            current_period_end = end_date
+        else:
+            # Indefinite subscription
+            end_date = None
+            current_period_end = None
+        
+        # Handle trial period if specified
+        trial_days = data.get('trial_days', 0)
+        trial_end_date = None
+        status = SubscriptionStatus.ACTIVE.value
+        
+        if trial_days > 0:
+            trial_end_date = now + timedelta(days=trial_days)
+            status = SubscriptionStatus.TRIAL.value
+        
+        # Create the subscription
+        subscription = UserSubscription(
+            user_id=user_id,
+            plan_id=plan.id,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            trial_end_date=trial_end_date,
+            current_period_start=current_period_start,
+            current_period_end=current_period_end,
+            payment_status=PaymentStatus.PAID.value,  # Assuming payment is handled elsewhere
+            quantity=data.get('quantity', 1),
+            auto_renew=data.get('auto_renew', True)
+        )
+        
+        db.session.add(subscription)
+        db.session.commit()
+        
+        return subscription, 201 
