@@ -1,7 +1,7 @@
 """
 Token blacklist model for handling revoked JWT tokens.
 """
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app import db
 from app.models.base import BaseModel
@@ -16,7 +16,7 @@ class TokenBlacklist(BaseModel):
     jti = db.Column(db.String(36), nullable=False, index=True, unique=True)
     token_type = db.Column(db.String(10), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    revoked_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    revoked_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC))
     expires_at = db.Column(db.DateTime, nullable=False)
     
     # Relationship

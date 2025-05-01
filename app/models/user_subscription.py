@@ -1,35 +1,43 @@
 """
-User Subscription model for managing user subscriptions to plans.
+User subscription model for handling user subscriptions to plans.
 """
-from datetime import datetime, timedelta
-from enum import Enum
+import enum
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Index, and_, func, or_
+from sqlalchemy import Index, and_, desc, func, or_
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import joinedload
 
 from app import db
+from app.models.base import BaseModel
 
-from .base import BaseModel
 
-
-class SubscriptionStatus(Enum):
+class SubscriptionStatus(enum.Enum):
     """Enum for subscription status values."""
     ACTIVE = "active"
     CANCELED = "canceled"
     EXPIRED = "expired"
+    PAST_DUE = "past_due"
     PENDING = "pending"
     TRIAL = "trial"
-    PAST_DUE = "past_due"
-    PAUSED = "paused"
+    
+    @classmethod
+    def values(cls):
+        """Get all enum values."""
+        return [e.value for e in cls]
 
 
-class PaymentStatus(Enum):
+class PaymentStatus(enum.Enum):
     """Enum for payment status values."""
     PAID = "paid"
     PENDING = "pending"
     FAILED = "failed"
     REFUNDED = "refunded"
+    
+    @classmethod
+    def values(cls):
+        """Get all enum values."""
+        return [e.value for e in cls]
 
 
 class UserSubscription(BaseModel):
@@ -57,11 +65,11 @@ class UserSubscription(BaseModel):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     plan_id = db.Column(db.Integer, db.ForeignKey('subscription_plans.id'), nullable=False)
     status = db.Column(db.String(20), nullable=False, default=SubscriptionStatus.PENDING.value)
-    start_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    start_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC))
     end_date = db.Column(db.DateTime, nullable=True)
     trial_end_date = db.Column(db.DateTime, nullable=True)
     canceled_at = db.Column(db.DateTime, nullable=True)
-    current_period_start = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    current_period_start = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC))
     current_period_end = db.Column(db.DateTime, nullable=True)
     payment_status = db.Column(db.String(20), nullable=False, default=PaymentStatus.PENDING.value)
     quantity = db.Column(db.Integer, nullable=False, default=1)
@@ -75,40 +83,23 @@ class UserSubscription(BaseModel):
     
     # Create indexes for common queries
     __table_args__ = (
-        # Index for querying a user's subscriptions
-        Index('idx_user_subscription_user_id', 'user_id'),
+        # Composite index for active subscriptions by user
+        Index('idx_user_subscription_user_status', 'user_id', 'status'),
         
-        # Index for querying subscriptions by plan
-        Index('idx_user_subscription_plan_id', 'plan_id'),
-        
-        # Index for querying active subscriptions
-        Index('idx_user_subscription_status', 'status'),
-        
-        # Index for date-based queries
-        Index('idx_user_subscription_start_date', 'start_date'),
-        Index('idx_user_subscription_end_date', 'end_date'),
-        Index('idx_user_subscription_current_period', 'current_period_start', 'current_period_end'),
-        
-        # Index for trial subscriptions
-        Index('idx_user_subscription_trial_end', 'trial_end_date'),
-        
-        # Index for payment status
-        Index('idx_user_subscription_payment', 'payment_status'),
-        
-        # Composite index for user's active subscriptions (common query)
-        Index('idx_user_active_subscriptions', 'user_id', 'status'),
-        
-        # Composite index for subscription by user and plan (important for lookup)
-        Index('idx_user_plan_subscription', 'user_id', 'plan_id'),
-        
-        # Composite index for renewal tracking
-        Index('idx_user_subscription_renewal', 'auto_renew', 'current_period_end'),
-        
-        # Composite index for cancellation at period end
-        Index('idx_user_subscription_cancel_period_end', 'cancel_at_period_end', 'current_period_end'),
+        # Composite index for expiring subscriptions (useful for renewal reminders)
+        Index('idx_user_subscription_status_period_end', 'status', 'current_period_end'),
         
         # Composite index for expiring trials (useful for notifications)
-        Index('idx_user_subscription_trial_status', 'status', 'trial_end_date')
+        Index('idx_user_subscription_trial_status', 'status', 'trial_end_date'),
+        
+        # Add composite index for user_id and status for efficient lookup of active subscriptions
+        Index('idx_user_subscriptions_user_id_status', 'user_id', 'status'),
+        
+        # Add composite index for status and end_date for filtering by status and end_date
+        Index('idx_user_subscriptions_status_end_date', 'status', 'end_date'),
+        
+        # Add composite index for status and current_period_end for filtering by status and current_period_end
+        Index('idx_user_subscriptions_status_current_period_end', 'status', 'current_period_end'),
     )
     
     def __init__(self, user_id, plan_id, status=SubscriptionStatus.PENDING.value, 
@@ -139,10 +130,10 @@ class UserSubscription(BaseModel):
         self.user_id = user_id
         self.plan_id = plan_id
         self.status = status
-        self.start_date = start_date or datetime.utcnow()
+        self.start_date = start_date or datetime.now(UTC)
         self.end_date = end_date
         self.trial_end_date = trial_end_date
-        self.current_period_start = current_period_start or datetime.utcnow()
+        self.current_period_start = current_period_start or datetime.now(UTC)
         self.current_period_end = current_period_end
         self.payment_status = payment_status
         self.quantity = quantity
@@ -159,10 +150,21 @@ class UserSubscription(BaseModel):
         Returns:
             bool: True if active, False otherwise
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
+        
+        # Handle timezone conversion if needed
+        start_date = self.start_date
+        end_date = self.end_date
+        
+        # If datetimes are naive, make them aware
+        if start_date and start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=UTC)
+        if end_date and end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=UTC)
+        
         return (self.status == SubscriptionStatus.ACTIVE.value and
-                self.start_date <= now and 
-                (self.end_date is None or self.end_date > now))
+                start_date <= now and 
+                (end_date is None or end_date > now))
     
     @is_active.expression
     def is_active(cls):
@@ -172,7 +174,7 @@ class UserSubscription(BaseModel):
         Returns:
             SQLAlchemy expression: Query expression for active subscriptions
         """
-        # Using func.now() instead of datetime.utcnow() for SQL expression
+        # Using func.now() instead of datetime.now(UTC) for SQL expression
         # This ensures the datetime is evaluated at the database level
         return and_(
             cls.status == SubscriptionStatus.ACTIVE.value,
@@ -191,10 +193,18 @@ class UserSubscription(BaseModel):
         Returns:
             bool: True if in trial, False otherwise
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
+        
+        # Handle timezone conversion if needed
+        trial_end_date = self.trial_end_date
+        
+        # If datetime is naive, make it aware
+        if trial_end_date and trial_end_date.tzinfo is None:
+            trial_end_date = trial_end_date.replace(tzinfo=UTC)
+        
         return (self.status == SubscriptionStatus.TRIAL.value and
-                self.trial_end_date is not None and 
-                self.trial_end_date > now)
+                trial_end_date is not None and 
+                trial_end_date > now)
     
     @is_trial.expression
     def is_trial(cls):
@@ -204,7 +214,7 @@ class UserSubscription(BaseModel):
         Returns:
             SQLAlchemy expression: Query expression for trial subscriptions
         """
-        # Using func.now() instead of datetime.utcnow() for SQL expression
+        # Using func.now() instead of datetime.now(UTC) for SQL expression
         return and_(
             cls.status == SubscriptionStatus.TRIAL.value,
             cls.trial_end_date != None,  # noqa: E711
@@ -222,8 +232,16 @@ class UserSubscription(BaseModel):
         if not self.current_period_end or not self.auto_renew:
             return None
             
-        now = datetime.utcnow()
-        delta = self.current_period_end - now
+        now = datetime.now(UTC)
+        
+        # Handle timezone conversion if needed
+        current_period_end = self.current_period_end
+        
+        # If datetime is naive, make it aware
+        if current_period_end and current_period_end.tzinfo is None:
+            current_period_end = current_period_end.replace(tzinfo=UTC)
+            
+        delta = current_period_end - now
         return max(0, delta.days)
     
     def activate(self):
@@ -241,7 +259,7 @@ class UserSubscription(BaseModel):
         Returns:
             UserSubscription: The subscription instance
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         
         if at_period_end:
             self.cancel_at_period_end = True
@@ -263,7 +281,7 @@ class UserSubscription(BaseModel):
         Returns:
             UserSubscription: The subscription instance
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         self.status = SubscriptionStatus.TRIAL.value
         self.trial_end_date = now + timedelta(days=trial_days)
         return self
@@ -278,7 +296,7 @@ class UserSubscription(BaseModel):
         Returns:
             UserSubscription: The subscription instance
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         self.current_period_start = now
         self.current_period_end = now + timedelta(days=days)
         
@@ -298,7 +316,8 @@ class UserSubscription(BaseModel):
             UserSubscription: The subscription instance
         """
         self.status = SubscriptionStatus.EXPIRED.value
-        self.end_date = datetime.utcnow()
+        self.end_date = datetime.now(UTC)
+        self.auto_renew = False
         return self
     
     def pause(self):
@@ -375,7 +394,7 @@ class UserSubscription(BaseModel):
         # 2. Eagerly loads the plan relationship to avoid N+1 query problems
         # 3. Uses proper date filtering at the database level
         
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         
         subscription = cls.query.options(
             joinedload(cls.plan)  # Eager load plan details
@@ -413,7 +432,7 @@ class UserSubscription(BaseModel):
         Returns:
             list: List of expiring subscriptions
         """
-        expiry_date = datetime.utcnow() + timedelta(days=days)
+        expiry_date = datetime.now(UTC) + timedelta(days=days)
         return cls.query.filter(
             cls.status == SubscriptionStatus.ACTIVE.value,
             cls.current_period_end <= expiry_date,
@@ -482,7 +501,7 @@ class UserSubscription(BaseModel):
             list: List of recent subscriptions
         """
         query = cls.query.filter(
-            cls.created_at >= datetime.utcnow() - timedelta(days=days)
+            cls.created_at >= datetime.now(UTC) - timedelta(days=days)
         )
         
         if status:
