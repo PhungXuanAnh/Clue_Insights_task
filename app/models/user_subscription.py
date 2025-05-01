@@ -4,10 +4,11 @@ User Subscription model for managing user subscriptions to plans.
 from datetime import datetime, timedelta
 from enum import Enum
 
-from sqlalchemy import Index, and_, or_, func
+from sqlalchemy import Index, and_, func, or_
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from app import db
+
 from .base import BaseModel
 
 
@@ -168,13 +169,14 @@ class UserSubscription(BaseModel):
         Returns:
             SQLAlchemy expression: Query expression for active subscriptions
         """
-        now = datetime.utcnow()
+        # Using func.now() instead of datetime.utcnow() for SQL expression
+        # This ensures the datetime is evaluated at the database level
         return and_(
             cls.status == SubscriptionStatus.ACTIVE.value,
-            cls.start_date <= now,
+            cls.start_date <= func.now(),
             or_(
                 cls.end_date == None,  # noqa: E711
-                cls.end_date > now
+                cls.end_date > func.now()
             )
         )
     
@@ -199,11 +201,11 @@ class UserSubscription(BaseModel):
         Returns:
             SQLAlchemy expression: Query expression for trial subscriptions
         """
-        now = datetime.utcnow()
+        # Using func.now() instead of datetime.utcnow() for SQL expression
         return and_(
             cls.status == SubscriptionStatus.TRIAL.value,
             cls.trial_end_date != None,  # noqa: E711
-            cls.trial_end_date > now
+            cls.trial_end_date > func.now()
         )
     
     @hybrid_property
@@ -365,6 +367,17 @@ class UserSubscription(BaseModel):
         Returns:
             UserSubscription: The active subscription or None
         """
+        # First try direct query by status (most reliable)
+        subscription = cls.query.filter_by(
+            user_id=user_id, 
+            status=SubscriptionStatus.ACTIVE.value
+        ).first()
+        
+        # If found, verify it's actually active by our definition
+        if subscription and subscription.is_active:
+            return subscription
+        
+        # If not found or not actually active, try with the hybrid property
         return cls.query.filter(
             cls.user_id == user_id,
             cls.is_active

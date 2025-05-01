@@ -3,7 +3,6 @@ Routes for subscription plans and user subscriptions.
 """
 import json
 from datetime import datetime, timedelta
-from http import HTTPStatus
 
 from flask import current_app, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -16,7 +15,11 @@ from app.models.subscription_plan import (
     SubscriptionPlan,
 )
 from app.models.user import User
-from app.models.user_subscription import PaymentStatus, SubscriptionStatus, UserSubscription
+from app.models.user_subscription import (
+    PaymentStatus,
+    SubscriptionStatus,
+    UserSubscription,
+)
 from app.utils.auth import admin_required
 
 from . import plan_ns, subscription_ns
@@ -114,6 +117,11 @@ subscription_input_model = subscription_ns.model('SubscriptionInput', {
 plan_change_model = subscription_ns.model('PlanChangeInput', {
     'plan_id': fields.Integer(required=True, description='New plan ID to upgrade/downgrade to'),
     'prorate': fields.Boolean(description='Whether to prorate the subscription change', default=True)
+})
+
+# Define input model for canceling subscription
+cancel_subscription_model = subscription_ns.model('CancelSubscriptionInput', {
+    'at_period_end': fields.Boolean(description='Whether to cancel at the end of the current period', default=True)
 })
 
 # API routes for subscription plans
@@ -429,6 +437,31 @@ class SubscriptionUpgrade(Resource):
         subscription.payment_status = PaymentStatus.PAID.value
         
         # Save changes
+        db.session.commit()
+        
+        return subscription 
+
+@subscription_ns.route('/cancel')
+class SubscriptionCancel(Resource):
+    """Resource for canceling user subscriptions"""
+    
+    @subscription_ns.doc('cancel_subscription')
+    @subscription_ns.expect(cancel_subscription_model)
+    @subscription_ns.marshal_with(subscription_model)
+    @subscription_ns.response(404, 'No active subscription found')
+    @jwt_required()
+    def post(self):
+        """Cancel a user's active subscription"""
+        user_id = get_jwt_identity()
+        data = request.json
+        at_period_end = data.get('at_period_end', True)
+        
+        subscription = UserSubscription.get_active_subscription(user_id)
+        
+        if not subscription:
+            subscription_ns.abort(404, 'No active subscription found')
+            
+        subscription.cancel(at_period_end=at_period_end)
         db.session.commit()
         
         return subscription 

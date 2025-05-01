@@ -297,3 +297,128 @@ def test_upgrade_to_inactive_plan(client, db, user_token):
     )
     
     assert response.status_code == 400 
+
+
+def test_cancel_subscription(client, db, user_token):
+    """Test canceling a subscription."""
+    # Create a plan
+    plan = SubscriptionPlan(
+        name="Standard Plan",
+        description="Standard features",
+        price=19.99
+    )
+    db.session.add(plan)
+    db.session.commit()
+    
+    # Create an active subscription to the plan
+    now = datetime.utcnow()
+    subscription = UserSubscription(
+        user_id=user_token['user_id'],
+        plan_id=plan.id,
+        status=SubscriptionStatus.ACTIVE.value,
+        start_date=now,
+        current_period_start=now,
+        current_period_end=now + timedelta(days=30),
+        payment_status=PaymentStatus.PAID.value
+    )
+    db.session.add(subscription)
+    db.session.commit()
+    
+    # Ensure the subscription is findable via is_active property
+    db.session.expire_all()  # Clear the session to force a fresh load
+    
+    # Cancel the subscription
+    cancel_data = {
+        "at_period_end": True
+    }
+    
+    response = client.post(
+        '/api/subscriptions/cancel',
+        data=json.dumps(cancel_data),
+        content_type='application/json',
+        headers={"Authorization": f"Bearer {user_token['token']}"}
+    )
+    data = json.loads(response.data)
+    
+    assert response.status_code == 200
+    assert data['user_id'] == user_token['user_id']
+    assert data['cancel_at_period_end'] == True
+    assert data['auto_renew'] == False
+    assert data['status'] == SubscriptionStatus.ACTIVE.value
+    
+    # Check that subscription was updated in database
+    updated_subscription = UserSubscription.query.get(subscription.id)
+    assert updated_subscription.cancel_at_period_end == True
+    assert updated_subscription.auto_renew == False
+
+
+def test_cancel_subscription_immediately(client, db, user_token):
+    """Test canceling a subscription immediately."""
+    # Create a plan
+    plan = SubscriptionPlan(
+        name="Standard Plan",
+        description="Standard features",
+        price=19.99
+    )
+    db.session.add(plan)
+    db.session.commit()
+    
+    # Create an active subscription to the plan
+    now = datetime.utcnow()
+    subscription = UserSubscription(
+        user_id=user_token['user_id'],
+        plan_id=plan.id,
+        status=SubscriptionStatus.ACTIVE.value,
+        start_date=now,
+        current_period_start=now,
+        current_period_end=now + timedelta(days=30),
+        payment_status=PaymentStatus.PAID.value
+    )
+    db.session.add(subscription)
+    db.session.commit()
+    
+    # Ensure the subscription is findable via is_active property
+    db.session.expire_all()  # Clear the session to force a fresh load
+    
+    # Cancel the subscription immediately
+    cancel_data = {
+        "at_period_end": False
+    }
+    
+    response = client.post(
+        '/api/subscriptions/cancel',
+        data=json.dumps(cancel_data),
+        content_type='application/json',
+        headers={"Authorization": f"Bearer {user_token['token']}"}
+    )
+    data = json.loads(response.data)
+    
+    assert response.status_code == 200
+    assert data['user_id'] == user_token['user_id']
+    assert data['status'] == SubscriptionStatus.CANCELED.value
+    assert data['canceled_at'] is not None
+    
+    # Check that subscription was updated in database
+    updated_subscription = UserSubscription.query.get(subscription.id)
+    assert updated_subscription.status == SubscriptionStatus.CANCELED.value
+    assert updated_subscription.canceled_at is not None
+
+
+def test_cancel_without_active_subscription(client, db, user_token):
+    """Test canceling without an active subscription (should fail)."""
+    # Ensure there are no active subscriptions
+    db.session.expire_all()  # Clear the session to force a fresh load
+    
+    # Cancel a non-existent subscription
+    cancel_data = {
+        "at_period_end": True
+    }
+    
+    response = client.post(
+        '/api/subscriptions/cancel',
+        data=json.dumps(cancel_data),
+        content_type='application/json',
+        headers={"Authorization": f"Bearer {user_token['token']}"}
+    )
+    
+    assert response.status_code == 404 
