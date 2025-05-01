@@ -6,6 +6,7 @@ from enum import Enum
 
 from sqlalchemy import Index, and_, func, or_
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import joinedload
 
 from app import db
 
@@ -367,21 +368,37 @@ class UserSubscription(BaseModel):
         Returns:
             UserSubscription: The active subscription or None
         """
-        # First try direct query by status (most reliable)
-        subscription = cls.query.filter_by(
-            user_id=user_id, 
-            status=SubscriptionStatus.ACTIVE.value
-        ).first()
+        # Optimized query that:
+        # 1. Uses the composite index idx_user_active_subscriptions
+        # 2. Eagerly loads the plan relationship to avoid N+1 query problems
+        # 3. Uses proper date filtering at the database level
         
-        # If found, verify it's actually active by our definition
-        if subscription and subscription.is_active:
-            return subscription
+        now = datetime.utcnow()
         
-        # If not found or not actually active, try with the hybrid property
-        return cls.query.filter(
+        subscription = cls.query.options(
+            joinedload(cls.plan)  # Eager load plan details
+        ).filter(
             cls.user_id == user_id,
-            cls.is_active
+            cls.status == SubscriptionStatus.ACTIVE.value,
+            cls.start_date <= now,
+            or_(
+                cls.end_date.is_(None),
+                cls.end_date > now
+            )
         ).first()
+        
+        # If not found, try looking for trial subscriptions that are still valid
+        if not subscription:
+            subscription = cls.query.options(
+                joinedload(cls.plan)  # Eager load plan details
+            ).filter(
+                cls.user_id == user_id,
+                cls.status == SubscriptionStatus.TRIAL.value,
+                cls.trial_end_date.isnot(None),
+                cls.trial_end_date > now
+            ).first()
+        
+        return subscription
     
     @classmethod
     def get_expiring_subscriptions(cls, days=7):

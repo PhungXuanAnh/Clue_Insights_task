@@ -105,6 +105,28 @@ subscription_model = subscription_ns.model('UserSubscription', {
     'updated_at': fields.DateTime(description='Last update date'),
 })
 
+# Extended subscription model with plan details
+subscription_with_plan_model = subscription_ns.model('UserSubscriptionWithPlan', {
+    'id': fields.Integer(description='Subscription ID'),
+    'user_id': fields.Integer(description='User ID'),
+    'plan_id': fields.Integer(description='Plan ID'),
+    'status': fields.String(description='Subscription status', 
+                           enum=[s.value for s in SubscriptionStatus]),
+    'start_date': fields.DateTime(description='Start date'),
+    'end_date': fields.DateTime(description='End date'),
+    'trial_end_date': fields.DateTime(description='Trial end date'),
+    'canceled_at': fields.DateTime(description='Cancellation date'),
+    'current_period_start': fields.DateTime(description='Current period start'),
+    'current_period_end': fields.DateTime(description='Current period end'),
+    'payment_status': fields.String(description='Payment status'),
+    'quantity': fields.Integer(description='Quantity'),
+    'cancel_at_period_end': fields.Boolean(description='Cancel at period end'),
+    'auto_renew': fields.Boolean(description='Auto renew'),
+    'created_at': fields.DateTime(description='Creation date'),
+    'updated_at': fields.DateTime(description='Last update date'),
+    'plan': fields.Nested(plan_model, description='Subscription plan details')
+})
+
 # Input model for creating a subscription
 subscription_input_model = subscription_ns.model('SubscriptionInput', {
     'plan_id': fields.Integer(required=True, description='Plan ID to subscribe to'),
@@ -398,11 +420,8 @@ class SubscriptionUpgrade(Resource):
         if new_plan.status != PlanStatus.ACTIVE.value:
             subscription_ns.abort(400, f"Cannot upgrade to an inactive plan")
         
-        # Get current active subscription
-        subscription = UserSubscription.query.filter(
-            UserSubscription.user_id == user_id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE.value
-        ).first()
+        # Get current active subscription using the optimized method
+        subscription = UserSubscription.get_active_subscription(user_id)
         
         if not subscription:
             subscription_ns.abort(404, f"No active subscription found for user")
@@ -412,7 +431,7 @@ class SubscriptionUpgrade(Resource):
             subscription_ns.abort(400, f"User is already subscribed to this plan")
         
         # Get the current plan for price comparison
-        current_plan = SubscriptionPlan.query.get(subscription.plan_id)
+        current_plan = subscription.plan  # Already loaded via eager loading
         
         # Record whether this is an upgrade or downgrade
         is_upgrade = new_plan.price > current_plan.price
@@ -464,4 +483,24 @@ class SubscriptionCancel(Resource):
         subscription.cancel(at_period_end=at_period_end)
         db.session.commit()
         
+        return subscription 
+
+@subscription_ns.route('/active')
+class ActiveSubscription(Resource):
+    """Resource for retrieving the user's active subscription"""
+    
+    @subscription_ns.doc('get_active_subscription')
+    @subscription_ns.marshal_with(subscription_with_plan_model)
+    @subscription_ns.response(404, 'No active subscription found')
+    @jwt_required()
+    def get(self):
+        """Get the user's active subscription"""
+        user_id = get_jwt_identity()
+        
+        # Use the optimized method to retrieve active subscription with plan details
+        subscription = UserSubscription.get_active_subscription(user_id)
+        
+        if not subscription:
+            subscription_ns.abort(404, 'No active subscription found')
+            
         return subscription 

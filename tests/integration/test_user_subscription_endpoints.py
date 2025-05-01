@@ -95,13 +95,15 @@ def test_upgrade_subscription(client, db, user_token):
         user_id=user_token['user_id'],
         plan_id=basic_plan.id,
         status=SubscriptionStatus.ACTIVE.value,
-        start_date=now,
+        start_date=now - timedelta(minutes=5),
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
-        payment_status=PaymentStatus.PAID.value
+        payment_status=PaymentStatus.PAID.value,
+        end_date=None
     )
     db.session.add(subscription)
     db.session.commit()
+    db.session.expire_all()
     
     # Upgrade to premium plan
     upgrade_data = {
@@ -146,13 +148,15 @@ def test_upgrade_to_same_plan(client, db, user_token):
         user_id=user_token['user_id'],
         plan_id=plan.id,
         status=SubscriptionStatus.ACTIVE.value,
-        start_date=now,
+        start_date=now - timedelta(minutes=5),
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
-        payment_status=PaymentStatus.PAID.value
+        payment_status=PaymentStatus.PAID.value,
+        end_date=None
     )
     db.session.add(subscription)
     db.session.commit()
+    db.session.expire_all()
     
     # Try to upgrade to the same plan
     upgrade_data = {
@@ -192,13 +196,15 @@ def test_downgrade_subscription(client, db, user_token):
         user_id=user_token['user_id'],
         plan_id=premium_plan.id,
         status=SubscriptionStatus.ACTIVE.value,
-        start_date=now,
+        start_date=now - timedelta(minutes=5),
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
-        payment_status=PaymentStatus.PAID.value
+        payment_status=PaymentStatus.PAID.value,
+        end_date=None
     )
     db.session.add(subscription)
     db.session.commit()
+    db.session.expire_all()
     
     # Downgrade to basic plan
     downgrade_data = {
@@ -316,10 +322,11 @@ def test_cancel_subscription(client, db, user_token):
         user_id=user_token['user_id'],
         plan_id=plan.id,
         status=SubscriptionStatus.ACTIVE.value,
-        start_date=now,
+        start_date=now - timedelta(minutes=5),
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
-        payment_status=PaymentStatus.PAID.value
+        payment_status=PaymentStatus.PAID.value,
+        end_date=None
     )
     db.session.add(subscription)
     db.session.commit()
@@ -369,10 +376,11 @@ def test_cancel_subscription_immediately(client, db, user_token):
         user_id=user_token['user_id'],
         plan_id=plan.id,
         status=SubscriptionStatus.ACTIVE.value,
-        start_date=now,
+        start_date=now - timedelta(minutes=5),  # Set start date to 5 minutes ago
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
-        payment_status=PaymentStatus.PAID.value
+        payment_status=PaymentStatus.PAID.value,
+        end_date=None
     )
     db.session.add(subscription)
     db.session.commit()
