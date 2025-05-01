@@ -116,7 +116,7 @@ class UserSubscription(BaseModel):
                  current_period_start=None, current_period_end=None,
                  payment_status=PaymentStatus.PENDING.value,
                  quantity=1, cancel_at_period_end=False, auto_renew=True,
-                 subscription_metadata=None):
+                 subscription_metadata=None, canceled_at=None):
         """
         Initialize a new UserSubscription instance.
         
@@ -134,6 +134,7 @@ class UserSubscription(BaseModel):
             cancel_at_period_end (bool, optional): Whether to cancel at period end
             auto_renew (bool, optional): Whether to auto-renew
             subscription_metadata (str, optional): Additional metadata
+            canceled_at (datetime, optional): When the subscription was canceled
         """
         self.user_id = user_id
         self.plan_id = plan_id
@@ -148,6 +149,7 @@ class UserSubscription(BaseModel):
         self.cancel_at_period_end = cancel_at_period_end
         self.auto_renew = auto_renew
         self.subscription_metadata = subscription_metadata
+        self.canceled_at = canceled_at
     
     @hybrid_property
     def is_active(self):
@@ -419,19 +421,53 @@ class UserSubscription(BaseModel):
         ).all()
     
     @classmethod
-    def get_user_subscription_history(cls, user_id):
+    def get_user_subscription_history(cls, user_id, status=None, from_date=None, to_date=None, page=1, per_page=10):
         """
-        Get a user's subscription history.
+        Get a user's subscription history with advanced filtering and pagination.
         
         Args:
             user_id (int): User ID
+            status (str or list, optional): Filter by status or list of statuses
+            from_date (datetime, optional): Filter subscriptions created after this date
+            to_date (datetime, optional): Filter subscriptions created before this date
+            page (int): Page number (for pagination)
+            per_page (int): Items per page (for pagination)
             
         Returns:
-            list: List of user's subscriptions
+            Pagination: SQLAlchemy pagination object with subscriptions and metadata
+            
+        Optimization strategies:
+            - Eagerly loads plan details to avoid N+1 query problems
+            - Uses composite indexes for efficient querying
+            - Provides pagination for handling large result sets
+            - Offers flexible filtering by status and date ranges
+            - Sorts by most recent first to show newest subscriptions
         """
-        return cls.query.filter(
+        # Start building query with plan data eager loading
+        query = cls.query.options(
+            joinedload(cls.plan)  # Eager load plan details
+        ).filter(
             cls.user_id == user_id
-        ).order_by(cls.created_at.desc()).all()
+        )
+        
+        # Apply status filter if provided
+        if status:
+            if isinstance(status, list):
+                query = query.filter(cls.status.in_(status))
+            else:
+                query = query.filter(cls.status == status)
+        
+        # Apply date range filters if provided
+        if from_date:
+            query = query.filter(cls.created_at >= from_date)
+        
+        if to_date:
+            query = query.filter(cls.created_at <= to_date)
+        
+        # Return paginated result with newest subscriptions first
+        return query.order_by(cls.created_at.desc()).paginate(
+            page=page, per_page=per_page
+        )
     
     @classmethod
     def get_recent_subscriptions(cls, days=30, status=None):

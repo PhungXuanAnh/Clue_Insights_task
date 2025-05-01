@@ -504,3 +504,69 @@ class ActiveSubscription(Resource):
             subscription_ns.abort(404, 'No active subscription found')
             
         return subscription 
+
+@subscription_ns.route('/history')
+class SubscriptionHistory(Resource):
+    """Resource for retrieving user subscription history"""
+    
+    @subscription_ns.doc('get_subscription_history', params={
+        'page': {'type': 'integer', 'default': 1, 'description': 'Page number'},
+        'per_page': {'type': 'integer', 'default': 10, 'description': 'Items per page'},
+        'status': {'type': 'string', 'description': 'Filter by status (comma-separated for multiple)'},
+        'from_date': {'type': 'string', 'description': 'Filter subscriptions from this date (ISO format)'},
+        'to_date': {'type': 'string', 'description': 'Filter subscriptions to this date (ISO format)'}
+    })
+    @subscription_ns.marshal_with(subscription_ns.model('SubscriptionHistoryList', {
+        'subscriptions': fields.List(fields.Nested(subscription_with_plan_model)),
+        'total': fields.Integer(description='Total number of subscriptions'),
+        'page': fields.Integer(description='Current page number'),
+        'per_page': fields.Integer(description='Items per page'),
+        'pages': fields.Integer(description='Total number of pages')
+    }))
+    @jwt_required()
+    def get(self):
+        """Get the user's subscription history with filtering and pagination"""
+        user_id = get_jwt_identity()
+        
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        status = request.args.get('status')
+        from_date_str = request.args.get('from_date')
+        to_date_str = request.args.get('to_date')
+        
+        # Process status parameter - convert comma-separated string to list if needed
+        status_list = None
+        if status:
+            status_list = [s.strip() for s in status.split(',')]
+        
+        # Process date parameters
+        from_date = None
+        to_date = None
+        
+        try:
+            if from_date_str:
+                from_date = datetime.fromisoformat(from_date_str.replace('Z', '+00:00'))
+            if to_date_str:
+                to_date = datetime.fromisoformat(to_date_str.replace('Z', '+00:00'))
+        except ValueError:
+            return subscription_ns.abort(400, 'Invalid date format. Use ISO format (e.g. 2023-01-01T00:00:00Z)')
+        
+        # Use the optimized method to retrieve subscription history with filters and pagination
+        pagination = UserSubscription.get_user_subscription_history(
+            user_id=user_id,
+            status=status_list,
+            from_date=from_date,
+            to_date=to_date,
+            page=page,
+            per_page=per_page
+        )
+        
+        # Return formatted response
+        return {
+            'subscriptions': pagination.items,
+            'total': pagination.total,
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'pages': pagination.pages
+        } 

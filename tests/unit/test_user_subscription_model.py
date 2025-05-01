@@ -229,14 +229,32 @@ class TestUserSubscriptionModel:
         db.session.add(new_sub)
         db.session.commit()
 
-        # Test getting history
-        history = UserSubscription.get_user_subscription_history(user.id)
-        assert len(history) == 2
+        # Test getting history with default pagination (no filters)
+        pagination = UserSubscription.get_user_subscription_history(user.id)
+        assert pagination.total == 2
+        assert len(pagination.items) == 2
         
         # Verify both subscriptions are in the history
-        subscription_statuses = [sub.status for sub in history]
+        subscription_statuses = [sub.status for sub in pagination.items]
         assert SubscriptionStatus.ACTIVE.value in subscription_statuses
         assert SubscriptionStatus.EXPIRED.value in subscription_statuses
         
         # Verify the ordering by created_at desc (newest first)
-        assert history[0].created_at > history[1].created_at 
+        assert pagination.items[0].created_at > pagination.items[1].created_at
+        
+        # Test filter by active status
+        active_pagination = UserSubscription.get_user_subscription_history(
+            user.id, status=SubscriptionStatus.ACTIVE.value
+        )
+        assert active_pagination.total == 1
+        assert active_pagination.items[0].status == SubscriptionStatus.ACTIVE.value
+        
+        # Test filter by date range
+        now = datetime.utcnow()
+        # This would get subscriptions created more than a day ago
+        past_pagination = UserSubscription.get_user_subscription_history(
+            user.id, 
+            to_date=now - timedelta(days=1)
+        )
+        # Both were created just now, so nothing should be returned
+        assert past_pagination.total == 0 
