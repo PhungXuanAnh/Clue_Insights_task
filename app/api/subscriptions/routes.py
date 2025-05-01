@@ -110,6 +110,12 @@ subscription_input_model = subscription_ns.model('SubscriptionInput', {
     'trial_days': fields.Integer(description='Number of trial days (if applicable)', default=0)
 })
 
+# Define input model for upgrading/downgrading subscription
+plan_change_model = subscription_ns.model('PlanChangeInput', {
+    'plan_id': fields.Integer(required=True, description='New plan ID to upgrade/downgrade to'),
+    'prorate': fields.Boolean(description='Whether to prorate the subscription change', default=True)
+})
+
 # API routes for subscription plans
 @plan_ns.route('/')
 class SubscriptionPlanList(Resource):
@@ -361,4 +367,68 @@ class UserSubscriptionList(Resource):
         db.session.add(subscription)
         db.session.commit()
         
-        return subscription, 201 
+        return subscription, 201
+
+# API route for upgrading/downgrading a subscription
+@subscription_ns.route('/upgrade')
+class SubscriptionUpgrade(Resource):
+    """Resource for upgrading/downgrading user subscription"""
+    
+    @subscription_ns.doc('upgrade_subscription')
+    @subscription_ns.expect(plan_change_model)
+    @subscription_ns.marshal_with(subscription_model)
+    @subscription_ns.response(400, 'Invalid plan or no active subscription')
+    @subscription_ns.response(404, 'Plan not found or no active subscription')
+    @jwt_required()
+    def post(self):
+        """Upgrade or downgrade to a different subscription plan"""
+        user_id = get_jwt_identity()
+        data = request.json
+        
+        # Get target plan
+        new_plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
+        if new_plan.status != PlanStatus.ACTIVE.value:
+            subscription_ns.abort(400, f"Cannot upgrade to an inactive plan")
+        
+        # Get current active subscription
+        subscription = UserSubscription.query.filter(
+            UserSubscription.user_id == user_id,
+            UserSubscription.status == SubscriptionStatus.ACTIVE.value
+        ).first()
+        
+        if not subscription:
+            subscription_ns.abort(404, f"No active subscription found for user")
+        
+        # Don't allow changing to the same plan
+        if subscription.plan_id == new_plan.id:
+            subscription_ns.abort(400, f"User is already subscribed to this plan")
+        
+        # Get the current plan for price comparison
+        current_plan = SubscriptionPlan.query.get(subscription.plan_id)
+        
+        # Record whether this is an upgrade or downgrade
+        is_upgrade = new_plan.price > current_plan.price
+        
+        # Change the plan
+        subscription.change_plan(new_plan.id, prorate=data.get('prorate', True))
+        
+        # Update subscription dates if interval/duration changed
+        now = datetime.utcnow()
+        
+        # Recalculate end date based on new plan duration
+        if new_plan.duration_months:
+            # Add months to current date
+            month = now.month - 1 + new_plan.duration_months
+            year = now.year + month // 12
+            month = month % 12 + 1
+            end_date = datetime(year, month, min(now.day, 28), now.hour, now.minute, now.second)
+            subscription.current_period_end = end_date
+            subscription.end_date = end_date
+        
+        # Update payment status - in a real system this would involve payment processing
+        subscription.payment_status = PaymentStatus.PAID.value
+        
+        # Save changes
+        db.session.commit()
+        
+        return subscription 
