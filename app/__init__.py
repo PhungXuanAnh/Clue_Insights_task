@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, make_response, render_template, request, render_template_string
 from flask_jwt_extended import JWTManager, get_jwt
 from flask_migrate import Migrate
 from flask_restx import Api
@@ -86,21 +86,6 @@ def create_app(config_name=None):
     # Initialize extensions with app
     db.init_app(app)
     jwt.init_app(app)
-    
-    # Initialize Flask-DebugToolbar in development mode
-    if app_config == 'development' and app.config.get('DEBUG'):
-        try:
-            from flask_debugtoolbar import DebugToolbarExtension
-            toolbar = DebugToolbarExtension(app)
-            
-            # Configure Flask-DebugToolbar
-            app.config['DEBUG_TB_ENABLED'] = True
-            app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
-            app.config['DEBUG_TB_PROFILER_ENABLED'] = True
-            
-            print("Flask-DebugToolbar initialized in development mode")
-        except ImportError:
-            print("Flask-DebugToolbar not available, skipping initialization")
     
     # Configure JWT token blacklist if enabled
     if app.config.get('JWT_BLACKLIST_ENABLED'):
@@ -183,5 +168,68 @@ def create_app(config_name=None):
     @app.shell_context_processor
     def shell_context():
         return {"app": app, "db": db}
+    
+    # Initialize DevToolbar extension for JSON responses
+    if app_config == 'development' and app.config.get('DEBUG'):
+        # Define a simple HTML template for wrapping JSON
+        json_wrapper_template = """
+        <html>
+            <head>
+                <title>Debugging JSON Response</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #333; }
+                    pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; overflow: auto; max-height: 500px; }
+                </style>
+            </head>
+            <body>
+                <h1>JSON Response with Debug Toolbar</h1>
+                <h2>HTTP Status: {{ http_code }}</h2>
+                <h2>JSON Response</h2>
+                <pre>{{ response }}</pre>
+            </body>
+        </html>
+        """
+        
+        # Create after_request handler before initializing the debug toolbar
+        @app.after_request
+        def after_request(response):
+            """
+            Wrap JSON responses in HTML when _debug=true is in the URL params
+            """
+            if (response.mimetype == "application/json" and 
+                request.args.get('_debug') == 'true'):
+                
+                # Create HTML response wrapping the JSON
+                html_wrapped_response = make_response(
+                    render_template_string(
+                        json_wrapper_template,
+                        response=response.get_data(as_text=True),
+                        http_code=response.status
+                    ),
+                    response.status_code
+                )
+                
+                # Let Flask application process the response
+                # This ensures the debug toolbar is added correctly
+                return app.process_response(html_wrapped_response)
+                
+            return response
+
+        # Now initialize the Flask-DebugToolbar
+        try:
+            from flask_debugtoolbar import DebugToolbarExtension
+            
+            # Configure Flask-DebugToolbar
+            app.config['DEBUG_TB_ENABLED'] = True
+            app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
+            app.config['DEBUG_TB_PROFILER_ENABLED'] = True
+            
+            # Initialize the extension
+            with app.app_context():
+                DebugToolbarExtension(app)
+                print("Flask-DebugToolbar initialized in development mode")
+        except ImportError:
+            print("Flask-DebugToolbar not available, skipping initialization")
     
     return app 

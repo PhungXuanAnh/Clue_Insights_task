@@ -1,0 +1,76 @@
+<html>
+    <head>
+        <title>Debug JSON Response</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }
+            h1 {
+                color: #333;
+            }
+            pre {
+                background-color: #f4f4f4;
+                padding: 10px;
+                border-radius: 5px;
+                overflow: auto;
+                max-height: 500px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Flask-DebugToolbar JSON Inspector</h1>
+        <h2>HTTP Status: {{ http_code }}</h2>
+        <h2>JSON Response</h2>
+        <pre>{{ response }}</pre>
+    </body>
+    <script>
+        // Global click handler for toolbar clicks using event delegation
+        document.addEventListener('click', function(event) {
+            // Look for clicks on toolbar panel links
+            if (event.target && (
+                event.target.matches('#flDebugPanelList li a') || 
+                event.target.matches('.flDebugPanelList li a') ||
+                event.target.closest('#flDebugPanelList li a') ||
+                event.target.closest('.flDebugPanelList li a')
+            )) {
+                event.preventDefault();
+                
+                // Get the panel className to identify which panel to show
+                const panelClass = event.target.className || 
+                                   (event.target.closest('a') ? event.target.closest('a').className : null);
+                
+                if (!panelClass) return;
+                
+                // Get the content panel
+                const current = document.querySelector('#flDebug #' + panelClass + '-content') || 
+                                document.querySelector('#' + panelClass + '-content');
+                
+                if (!current) return;
+                                
+                // Toggle visibility
+                const isVisible = current.style.display !== 'none';
+                
+                // Hide all panels first
+                const panels = document.querySelectorAll('.panelContent');
+                panels.forEach(panel => panel.style.display = 'none');
+                
+                // Remove active class from all panel buttons
+                const buttons = document.querySelectorAll('#flDebugPanelList li, .flDebugPanelList li');
+                buttons.forEach(btn => btn.classList.remove('active'));
+                
+                // If panel wasn't visible, show it and mark button as active
+                if (!isVisible) {
+                    current.style.display = 'block';
+                    const parentLi = event.target.closest('li');
+                    if (parentLi) {
+                        parentLi.classList.add('active');
+                    }
+                }
+                
+                // Prevent event from propagating
+                return false;
+            }
+        }, true);
+    </script>
+</html> 
