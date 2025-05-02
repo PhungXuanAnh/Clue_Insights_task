@@ -167,6 +167,8 @@ The default admin credentials are:
 ├── tests/                  # Test suite
 │   ├── unit/               # Unit tests
 │   └── integration/        # Integration tests
+├── docs/                   # Documentation files
+│   └── profiling_queries.md # Guide for query profiling
 ├── init-db/                # Database initialization scripts
 ├── docker-compose.yml      # Docker Compose configuration for development
 ├── docker-compose.test.yml # Docker Compose configuration for testing
@@ -198,3 +200,19 @@ This API implements the following optimization strategies:
 4. Efficient pagination for list operations
 
 See the API documentation for detailed explanations of specific optimizations.
+
+## Query Profiling
+
+The development environment includes Flask-DebugToolbar for profiling SQL queries:
+
+1. Access any HTML endpoint (like `/api/docs`) in development mode
+2. Use the SQLAlchemy panel to identify slow queries
+3. Use the Profiler panel to analyze execution times
+
+For JSON API endpoints, you can use the SQLAlchemy echo feature which logs all SQL to the console:
+```bash
+# View the most recent SQL queries and execution times
+docker logs --tail 100 clue_insights_task-app-1
+```
+
+See `docs/profiling_queries.md` for detailed instructions on profiling.

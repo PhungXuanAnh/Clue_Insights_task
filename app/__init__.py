@@ -87,6 +87,21 @@ def create_app(config_name=None):
     db.init_app(app)
     jwt.init_app(app)
     
+    # Initialize Flask-DebugToolbar in development mode
+    if app_config == 'development' and app.config.get('DEBUG'):
+        try:
+            from flask_debugtoolbar import DebugToolbarExtension
+            toolbar = DebugToolbarExtension(app)
+            
+            # Configure Flask-DebugToolbar
+            app.config['DEBUG_TB_ENABLED'] = True
+            app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
+            app.config['DEBUG_TB_PROFILER_ENABLED'] = True
+            
+            print("Flask-DebugToolbar initialized in development mode")
+        except ImportError:
+            print("Flask-DebugToolbar not available, skipping initialization")
+    
     # Configure JWT token blacklist if enabled
     if app.config.get('JWT_BLACKLIST_ENABLED'):
         # Import token blacklist model
@@ -114,7 +129,8 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
     
     # Import models to ensure they're registered with SQLAlchemy
-    from app.models import SubscriptionPlan, TokenBlacklist, User, UserSubscription
+    from app.models import (SubscriptionPlan, TokenBlacklist, User,
+                            UserSubscription)
 
     # Create API with additional configuration for Swagger UI documentation
     api = Api(
@@ -136,7 +152,7 @@ def create_app(config_name=None):
     
     # Register blueprints and namespaces here
     from app.api.auth import auth_ns
-    from app.api.subscriptions import subscription_ns, plan_ns
+    from app.api.subscriptions import plan_ns, subscription_ns
 
     api.add_namespace(auth_ns, path='/api/auth')
     api.add_namespace(plan_ns, path='/api/plans')
