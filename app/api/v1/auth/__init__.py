@@ -1,5 +1,5 @@
 """
-Authentication namespace for handling user authentication.
+Authentication namespace for handling user authentication (v1).
 """
 from flask_restx import Namespace
 

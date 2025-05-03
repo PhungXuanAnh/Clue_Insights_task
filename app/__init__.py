@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, make_response, render_template, request, render_template_string
+from flask import Flask, jsonify, make_response, render_template, render_template_string, request
 from flask_jwt_extended import JWTManager, get_jwt
 from flask_migrate import Migrate
 from flask_restx import Api
@@ -136,10 +136,11 @@ def create_app(config_name=None):
     )
     
     # Register blueprints and namespaces here
-    from app.api.auth import auth_ns
     from app.api.v1.subscriptions import plan_ns, subscription_ns
+    from app.api.v1.auth import auth_ns as auth_ns_v1
 
-    api.add_namespace(auth_ns, path='/api/auth')
+    # Register namespaces with API versioning (v1)
+    api.add_namespace(auth_ns_v1, path='/api/v1/auth')
     api.add_namespace(plan_ns, path='/api/v1/plans')
     api.add_namespace(subscription_ns, path='/api/v1/subscriptions')
     
