@@ -1,5 +1,5 @@
 """
-Subscriptions namespace for managing subscription plans and user subscriptions.
+V1 Subscription namespaces for managing subscription plans and user subscriptions.
 """
 from flask_restx import Namespace
 

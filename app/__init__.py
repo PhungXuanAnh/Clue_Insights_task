@@ -137,11 +137,11 @@ def create_app(config_name=None):
     
     # Register blueprints and namespaces here
     from app.api.auth import auth_ns
-    from app.api.subscriptions import plan_ns, subscription_ns
+    from app.api.v1.subscriptions import plan_ns, subscription_ns
 
     api.add_namespace(auth_ns, path='/api/auth')
-    api.add_namespace(plan_ns, path='/api/plans')
-    api.add_namespace(subscription_ns, path='/api/subscriptions')
+    api.add_namespace(plan_ns, path='/api/v1/plans')
+    api.add_namespace(subscription_ns, path='/api/v1/subscriptions')
     
     # Create a health check route
     @app.route('/health')

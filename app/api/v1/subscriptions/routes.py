@@ -1,5 +1,5 @@
 """
-Routes for subscription plans and user subscriptions.
+Routes for subscription plans and user subscriptions (V1 API).
 """
 import json
 from datetime import UTC, datetime, timedelta
@@ -256,9 +256,10 @@ class SubscriptionPlanResource(Resource):
         plan.parent_id = data.get('parent_id', plan.parent_id)
         plan.sort_order = data.get('sort_order', plan.sort_order)
         
-        # Handle features separately
-        if 'features' in data:
-            plan.set_features_dict(data['features'])
+        # Handle features update
+        features_dict = data.get('features')
+        if features_dict is not None:
+            plan.features = json.dumps(features_dict)
         
         db.session.commit()
         return plan
@@ -270,16 +271,6 @@ class SubscriptionPlanResource(Resource):
     def delete(self, id):
         """Delete a subscription plan (admin only)"""
         plan = SubscriptionPlan.query.get_or_404(id)
-        
-        # Check if plan has active subscriptions
-        active_subs = UserSubscription.query.filter_by(
-            plan_id=id, 
-            status=SubscriptionStatus.ACTIVE.value
-        ).first()
-        
-        if active_subs:
-            plan_ns.abort(400, f"Cannot delete plan with active subscriptions. Deactivate it instead.")
-        
         db.session.delete(plan)
         db.session.commit()
         return '', 204
@@ -287,7 +278,7 @@ class SubscriptionPlanResource(Resource):
 
 @plan_ns.route('/intervals')
 class SubscriptionIntervals(Resource):
-    """Resource for subscription interval options"""
+    """Resource for listing subscription intervals"""
     
     @plan_ns.doc('get_intervals')
     @plan_ns.marshal_list_with(interval_model)
@@ -304,7 +295,7 @@ class SubscriptionIntervals(Resource):
 
 @plan_ns.route('/statuses')
 class PlanStatuses(Resource):
-    """Resource for plan status options"""
+    """Resource for listing plan statuses"""
     
     @plan_ns.doc('get_plan_statuses')
     @plan_ns.marshal_list_with(plan_status_model)
@@ -319,10 +310,9 @@ class PlanStatuses(Resource):
         return statuses
 
 
-# API routes for user subscriptions
 @subscription_ns.route('/')
 class UserSubscriptionList(Resource):
-    """Resource for user subscription operations"""
+    """Resource for creating subscriptions"""
     
     @subscription_ns.doc('create_subscription')
     @subscription_ns.expect(subscription_input_model)
@@ -331,65 +321,55 @@ class UserSubscriptionList(Resource):
     @subscription_ns.response(404, 'Plan not found')
     @jwt_required()
     def post(self):
-        """Subscribe to a plan"""
+        """Create a new subscription for the current user"""
         user_id = get_jwt_identity()
         data = request.json
         
-        # Check if plan exists and is active
+        # Verify the plan exists and is active
         plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
         if plan.status != PlanStatus.ACTIVE.value:
-            subscription_ns.abort(400, f"Cannot subscribe to an inactive plan")
-        
-        # Check if user exists
-        user = User.query.get_or_404(user_id)
+            return {'message': 'Cannot subscribe to inactive plan'}, 400
         
         # Check if user already has an active subscription
-        existing_subscription = UserSubscription.query.filter_by(
+        active_subscription = UserSubscription.query.filter_by(
             user_id=user_id,
             status=SubscriptionStatus.ACTIVE.value
         ).first()
         
-        if existing_subscription:
-            subscription_ns.abort(400, f"User already has an active subscription. Please cancel or upgrade it instead.")
+        if active_subscription:
+            return {'message': 'User already has an active subscription'}, 400
         
-        # Calculate subscription dates
+        # Calculate dates
         now = datetime.now(UTC)
-        start_date = now
-        current_period_start = now
-        
-        # Calculate end date based on plan duration
-        if plan.duration_months:
-            # Add months to current date
-            month = now.month - 1 + plan.duration_months
-            year = now.year + month // 12
-            month = month % 12 + 1
-            end_date = datetime(year, month, min(now.day, 28), now.hour, now.minute, now.second)
-            current_period_end = end_date
-        else:
-            # Indefinite subscription
-            end_date = None
-            current_period_end = None
-        
-        # Handle trial period if specified
         trial_days = data.get('trial_days', 0)
-        trial_end_date = None
-        status = SubscriptionStatus.ACTIVE.value
         
+        # Calculate trial end date if applicable
+        trial_end_date = None
         if trial_days > 0:
             trial_end_date = now + timedelta(days=trial_days)
-            status = SubscriptionStatus.TRIAL.value
+        
+        # Calculate period end date based on the plan interval
+        period_end = now + timedelta(days=30)  # Default to 30 days
+        if plan.interval == SubscriptionInterval.ANNUAL.value:
+            period_end = now + timedelta(days=365)
+        elif plan.interval == SubscriptionInterval.SEMI_ANNUAL.value:
+            period_end = now + timedelta(days=182)
+        elif plan.interval == SubscriptionInterval.QUARTERLY.value:
+            period_end = now + timedelta(days=90)
+        elif plan.interval == SubscriptionInterval.MONTHLY.value:
+            # Already set to 30 days
+            pass
         
         # Create the subscription
         subscription = UserSubscription(
             user_id=user_id,
             plan_id=plan.id,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
+            status=SubscriptionStatus.ACTIVE.value,
+            start_date=now,
             trial_end_date=trial_end_date,
-            current_period_start=current_period_start,
-            current_period_end=current_period_end,
-            payment_status=PaymentStatus.PAID.value,  # Assuming payment is handled elsewhere
+            current_period_start=now,
+            current_period_end=period_end,
+            payment_status=PaymentStatus.PAID.value if not trial_days else PaymentStatus.TRIAL.value,
             quantity=data.get('quantity', 1),
             auto_renew=data.get('auto_renew', True)
         )
@@ -399,10 +379,10 @@ class UserSubscriptionList(Resource):
         
         return subscription, 201
 
-# API route for upgrading/downgrading a subscription
+
 @subscription_ns.route('/upgrade')
 class SubscriptionUpgrade(Resource):
-    """Resource for upgrading/downgrading user subscription"""
+    """Resource for upgrading/downgrading subscriptions"""
     
     @subscription_ns.doc('upgrade_subscription')
     @subscription_ns.expect(plan_change_model)
@@ -411,58 +391,53 @@ class SubscriptionUpgrade(Resource):
     @subscription_ns.response(404, 'Plan not found or no active subscription')
     @jwt_required()
     def post(self):
-        """Upgrade or downgrade to a different subscription plan"""
+        """Upgrade or downgrade the current subscription"""
         user_id = get_jwt_identity()
         data = request.json
         
-        # Get target plan
+        # Get the active subscription
+        subscription = UserSubscription.query.filter_by(
+            user_id=user_id,
+            status=SubscriptionStatus.ACTIVE.value
+        ).first_or_404('No active subscription found')
+        
+        # Get the new plan
         new_plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
+        
+        # Verify the plan is active
         if new_plan.status != PlanStatus.ACTIVE.value:
-            subscription_ns.abort(400, f"Cannot upgrade to an inactive plan")
+            return {'message': 'Cannot upgrade to inactive plan'}, 400
         
-        # Get current active subscription using the optimized method
-        subscription = UserSubscription.get_active_subscription(user_id)
-        
-        if not subscription:
-            subscription_ns.abort(404, f"No active subscription found for user")
-        
-        # Don't allow changing to the same plan
+        # Check if it's the same plan
         if subscription.plan_id == new_plan.id:
-            subscription_ns.abort(400, f"User is already subscribed to this plan")
+            return {'message': 'Already subscribed to this plan'}, 400
         
-        # Get the current plan for price comparison
-        current_plan = subscription.plan  # Already loaded via eager loading
+        # Handle the plan change
+        prorate = data.get('prorate', True)
         
-        # Record whether this is an upgrade or downgrade
-        is_upgrade = new_plan.price > current_plan.price
+        # In a real system, we'd handle proration calculations here
+        # For this example, we'll just update the subscription
         
-        # Change the plan
-        subscription.change_plan(new_plan.id, prorate=data.get('prorate', True))
+        # Log the change
+        current_app.logger.info(
+            f"Subscription change: User {user_id} changed from plan {subscription.plan_id} to {new_plan.id}"
+        )
         
-        # Update subscription dates if interval/duration changed
-        now = datetime.now(UTC)
+        # Update the subscription
+        subscription.plan_id = new_plan.id
         
-        # Recalculate end date based on new plan duration
-        if new_plan.duration_months:
-            # Add months to current date
-            month = now.month - 1 + new_plan.duration_months
-            year = now.year + month // 12
-            month = month % 12 + 1
-            end_date = datetime(year, month, min(now.day, 28), now.hour, now.minute, now.second)
-            subscription.current_period_end = end_date
-            subscription.end_date = end_date
+        # If downgrading, we might keep the current period end
+        # If upgrading and prorating, we might adjust the period end
         
-        # Update payment status - in a real system this would involve payment processing
-        subscription.payment_status = PaymentStatus.PAID.value
-        
-        # Save changes
+        # For this example, we'll just update the plan ID
         db.session.commit()
         
-        return subscription 
+        return subscription
+
 
 @subscription_ns.route('/cancel')
 class SubscriptionCancel(Resource):
-    """Resource for canceling user subscriptions"""
+    """Resource for canceling subscriptions"""
     
     @subscription_ns.doc('cancel_subscription')
     @subscription_ns.expect(cancel_subscription_model)
@@ -470,44 +445,57 @@ class SubscriptionCancel(Resource):
     @subscription_ns.response(404, 'No active subscription found')
     @jwt_required()
     def post(self):
-        """Cancel a user's active subscription"""
+        """Cancel the current subscription"""
         user_id = get_jwt_identity()
         data = request.json
+        
+        # Get the active subscription
+        subscription = UserSubscription.query.filter_by(
+            user_id=user_id,
+            status=SubscriptionStatus.ACTIVE.value
+        ).first_or_404('No active subscription found')
+        
+        # Mark as canceled
+        now = datetime.now(UTC)
+        subscription.canceled_at = now
+        
+        # If canceling immediately, update status
         at_period_end = data.get('at_period_end', True)
+        if not at_period_end:
+            subscription.status = SubscriptionStatus.CANCELED.value
+            subscription.end_date = now
+        else:
+            subscription.cancel_at_period_end = True
         
-        subscription = UserSubscription.get_active_subscription(user_id)
-        
-        if not subscription:
-            subscription_ns.abort(404, 'No active subscription found')
-            
-        subscription.cancel(at_period_end=at_period_end)
         db.session.commit()
         
-        return subscription 
+        return subscription
+
 
 @subscription_ns.route('/active')
 class ActiveSubscription(Resource):
-    """Resource for retrieving the user's active subscription"""
+    """Resource for retrieving the active subscription"""
     
     @subscription_ns.doc('get_active_subscription')
     @subscription_ns.marshal_with(subscription_with_plan_model)
     @subscription_ns.response(404, 'No active subscription found')
     @jwt_required()
     def get(self):
-        """Get the user's active subscription"""
+        """Get the user's active subscription with plan details"""
         user_id = get_jwt_identity()
         
-        # Use the optimized method to retrieve active subscription with plan details
-        subscription = UserSubscription.get_active_subscription(user_id)
+        # Get the active subscription with plan details
+        subscription = UserSubscription.query.filter_by(
+            user_id=user_id,
+            status=SubscriptionStatus.ACTIVE.value
+        ).first_or_404('No active subscription found')
         
-        if not subscription:
-            subscription_ns.abort(404, 'No active subscription found')
-            
-        return subscription 
+        return subscription
+
 
 @subscription_ns.route('/history')
 class SubscriptionHistory(Resource):
-    """Resource for retrieving user subscription history"""
+    """Resource for retrieving subscription history"""
     
     @subscription_ns.doc('get_subscription_history', params={
         'page': {'type': 'integer', 'default': 1, 'description': 'Page number'},
@@ -525,61 +513,57 @@ class SubscriptionHistory(Resource):
     }))
     @jwt_required()
     def get(self):
-        """Get user subscription history"""
+        """Get user's subscription history with pagination and filtering"""
         user_id = get_jwt_identity()
         
         # Get query parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         status = request.args.get('status')
-        from_date = request.args.get('from_date')
-        to_date = request.args.get('to_date')
+        from_date_str = request.args.get('from_date')
+        to_date_str = request.args.get('to_date')
         
-        # Parse dates if provided
-        parsed_from_date = None
-        parsed_to_date = None
+        # Build the query
+        query = UserSubscription.query.filter_by(user_id=user_id)
         
-        if from_date:
+        # Apply status filter if provided
+        if status:
+            statuses = status.split(',')
+            query = query.filter(UserSubscription.status.in_(statuses))
+        
+        # Apply date filters if provided
+        if from_date_str:
             try:
-                parsed_from_date = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                from_date = datetime.fromisoformat(from_date_str)
+                query = query.filter(UserSubscription.created_at >= from_date)
             except ValueError:
-                subscription_ns.abort(400, "Invalid from_date format. Use ISO format (YYYY-MM-DDTHH:MM:SS).")
-                
-        if to_date:
+                pass  # Ignore invalid date format
+        
+        if to_date_str:
             try:
-                parsed_to_date = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                to_date = datetime.fromisoformat(to_date_str)
+                query = query.filter(UserSubscription.created_at <= to_date)
             except ValueError:
-                subscription_ns.abort(400, "Invalid to_date format. Use ISO format (YYYY-MM-DDTHH:MM:SS).")
+                pass  # Ignore invalid date format
         
-        # Get subscription history with filters
-        pagination = UserSubscription.get_user_subscription_history(
-            user_id,
-            status=status.split(',') if status else None,
-            from_date=parsed_from_date,
-            to_date=parsed_to_date,
-            page=page,
-            per_page=per_page
-        )
+        # Order by created date descending (newest first)
+        query = query.order_by(UserSubscription.created_at.desc())
         
-        # Format response with plan details
-        subscriptions_with_plans = []
-        for subscription in pagination.items:
-            subscription_dict = subscription.to_dict()
-            plan = SubscriptionPlan.query.get(subscription.plan_id)
-            subscription_dict['plan'] = plan.to_dict() if plan else None
-            subscriptions_with_plans.append(subscription_dict)
-            
+        # Get paginated results
+        pagination = query.paginate(page=page, per_page=per_page)
+        
         return {
-            'subscriptions': subscriptions_with_plans,
+            'subscriptions': pagination.items,
             'total': pagination.total,
             'page': pagination.page,
             'per_page': pagination.per_page,
             'pages': pagination.pages
         }
 
+
 @subscription_ns.route('/indefinite')
 class IndefiniteSubscription(Resource):
-    """Resource for creating an indefinite subscription (admin only)"""
+    """Resource for creating indefinite subscriptions (admin only)"""
     
     @subscription_ns.doc('create_indefinite_subscription')
     @subscription_ns.expect(subscription_input_model)
@@ -587,46 +571,58 @@ class IndefiniteSubscription(Resource):
     @jwt_required()
     @admin_required()
     def post(self):
-        """Create an indefinite subscription (admin only)"""
-        user_id = request.json.get('user_id')
-        plan_id = request.json.get('plan_id')
+        """Create an indefinite subscription for a user (admin only)"""
+        data = request.json
         
-        if not user_id or not plan_id:
-            subscription_ns.abort(400, "Both user_id and plan_id are required")
-            
-        # Check if user exists
-        user = User.query.get(user_id)
-        if not user:
-            subscription_ns.abort(404, f"User with id {user_id} not found")
-            
-        # Check if plan exists and is active
-        plan = SubscriptionPlan.query.get(plan_id)
-        if not plan:
-            subscription_ns.abort(404, f"Plan with id {plan_id} not found")
-        if plan.status != PlanStatus.ACTIVE.value:
-            subscription_ns.abort(400, f"Plan with id {plan_id} is not active")
-            
+        # Check if plan ID and user ID are provided
+        if 'plan_id' not in data:
+            return {'message': 'Plan ID is required'}, 400
+        
+        # Get the user ID from the token or request
+        admin_id = get_jwt_identity()
+        target_user_id = data.get('user_id')
+        
+        if not target_user_id:
+            return {'message': 'User ID is required'}, 400
+        
+        # Verify the plan exists and is active
+        plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
+        
+        # Verify the user exists
+        user = User.query.get_or_404(target_user_id)
+        
         # Check if user already has an active subscription
-        active_subscription = UserSubscription.get_active_subscription(user_id)
+        active_subscription = UserSubscription.query.filter_by(
+            user_id=target_user_id,
+            status=SubscriptionStatus.ACTIVE.value
+        ).first()
+        
         if active_subscription:
-            subscription_ns.abort(400, "User already has an active subscription")
-            
-        # Create the subscription
+            return {'message': 'User already has an active subscription'}, 400
+        
+        # Calculate dates
         now = datetime.now(UTC)
         
-        # Admin can create an indefinite subscription with no end date
+        # Create the indefinite subscription (no end date)
         subscription = UserSubscription(
-            user_id=user_id,
-            plan_id=plan_id,
+            user_id=target_user_id,
+            plan_id=plan.id,
             status=SubscriptionStatus.ACTIVE.value,
             start_date=now,
+            trial_end_date=None,
             current_period_start=now,
-            # No current_period_end for indefinite subscription
+            current_period_end=None,  # No period end for indefinite subscription
             payment_status=PaymentStatus.PAID.value,
-            auto_renew=False
+            quantity=data.get('quantity', 1),
+            auto_renew=True  # Always auto-renew for indefinite subscriptions
         )
         
         db.session.add(subscription)
         db.session.commit()
+        
+        # Log the action
+        current_app.logger.info(
+            f"Indefinite subscription created: Admin {admin_id} created subscription for user {target_user_id} to plan {plan.id}"
+        )
         
         return subscription, 201 

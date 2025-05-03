@@ -30,7 +30,7 @@ def test_get_subscription_plans(client, db):
     db.session.commit()
     
     # Make request to get plans
-    response = client.get('/api/plans/')
+    response = client.get('/api/v1/plans/')
     data = json.loads(response.data)
     
     assert response.status_code == 200
@@ -52,7 +52,7 @@ def test_get_subscription_plan_by_id(client, db):
     db.session.commit()
     
     # Make request to get the plan
-    response = client.get(f'/api/plans/{plan.id}')
+    response = client.get(f'/api/v1/plans/{plan.id}')
     data = json.loads(response.data)
     
     assert response.status_code == 200
@@ -62,7 +62,7 @@ def test_get_subscription_plan_by_id(client, db):
 
 def test_get_nonexistent_plan(client):
     """Test retrieving a plan that doesn't exist."""
-    response = client.get('/api/plans/9999')
+    response = client.get('/api/v1/plans/9999')
     assert response.status_code == 404
 
 
@@ -80,7 +80,7 @@ def test_create_subscription_plan_with_auth(client, db, admin_token):
     }
     
     response = client.post(
-        '/api/plans/',
+        '/api/v1/plans/',
         data=json.dumps(plan_data),
         content_type='application/json',
         headers={"Authorization": f"Bearer {admin_token}"}
@@ -109,7 +109,7 @@ def test_create_subscription_plan_without_auth(client):
     }
     
     response = client.post(
-        '/api/plans/',
+        '/api/v1/plans/',
         data=json.dumps(plan_data),
         content_type='application/json'
     )
@@ -138,7 +138,7 @@ def test_update_subscription_plan(client, db, admin_token):
     }
     
     response = client.put(
-        f'/api/plans/{plan.id}',
+        f'/api/v1/plans/{plan.id}',
         data=json.dumps(update_data),
         content_type='application/json',
         headers={"Authorization": f"Bearer {admin_token}"}
@@ -171,7 +171,7 @@ def test_delete_subscription_plan(client, db, admin_token):
     plan_id = plan.id
     
     response = client.delete(
-        f'/api/plans/{plan_id}',
+        f'/api/v1/plans/{plan_id}',
         headers={"Authorization": f"Bearer {admin_token}"}
     )
     
@@ -184,7 +184,7 @@ def test_delete_subscription_plan(client, db, admin_token):
 
 def test_get_intervals(client):
     """Test getting all subscription intervals."""
-    response = client.get('/api/plans/intervals')
+    response = client.get('/api/v1/plans/intervals')
     data = json.loads(response.data)
     
     assert response.status_code == 200
@@ -198,7 +198,7 @@ def test_get_intervals(client):
 
 def test_get_plan_statuses(client):
     """Test getting all plan status options."""
-    response = client.get('/api/plans/statuses')
+    response = client.get('/api/v1/plans/statuses')
     data = json.loads(response.data)
     
     assert response.status_code == 200
@@ -229,7 +229,7 @@ def test_filtering_plans_by_status(client, db):
     db.session.commit()
     
     # Test filtering by active status
-    response = client.get('/api/plans/?status=active')
+    response = client.get('/api/v1/plans/?status=active')
     data = json.loads(response.data)
     
     assert response.status_code == 200
@@ -237,7 +237,7 @@ def test_filtering_plans_by_status(client, db):
     assert data['plans'][0]['name'] == "Active Plan"
     
     # Test filtering by inactive status
-    response = client.get('/api/plans/?status=inactive')
+    response = client.get('/api/v1/plans/?status=inactive')
     data = json.loads(response.data)
     
     assert response.status_code == 200
@@ -256,37 +256,91 @@ def test_public_and_non_public_plans(client, db):
     )
     private_plan = SubscriptionPlan(
         name="Private Plan",
-        description="Private plan for testing",
-        price=29.99,
+        description="Non-public plan for testing",
+        price=19.99,
         is_public=False
     )
     db.session.add_all([public_plan, private_plan])
     db.session.commit()
     
-    # Test default behavior (public_only=true)
-    response = client.get('/api/plans/')
+    # Test filtering to show only public plans (default)
+    response = client.get('/api/v1/plans/')
     data = json.loads(response.data)
     
     assert response.status_code == 200
     assert data['total'] == 1
     assert data['plans'][0]['name'] == "Public Plan"
     
-    # Test getting all plans (public and private)
-    response = client.get('/api/plans/?public_only=false')
+    # Test showing all plans
+    response = client.get('/api/v1/plans/?public_only=false')
     data = json.loads(response.data)
     
     assert response.status_code == 200
     assert data['total'] == 2
+    
+    # Check plan names in results (order might vary)
     plan_names = [p['name'] for p in data['plans']]
     assert "Public Plan" in plan_names
     assert "Private Plan" in plan_names
 
 
+def test_pagination(client, db):
+    """Test pagination of subscription plans."""
+    # Create multiple plans
+    for i in range(15):
+        plan = SubscriptionPlan(
+            name=f"Plan {i+1}",
+            description=f"Test plan {i+1}",
+            price=10.00 + i,
+            sort_order=i
+        )
+        db.session.add(plan)
+    db.session.commit()
+    
+    # Test first page with 5 items per page
+    response = client.get('/api/v1/plans/?per_page=5&page=1')
+    data = json.loads(response.data)
+    
+    assert response.status_code == 200
+    assert data['total'] == 15
+    assert data['page'] == 1
+    assert data['per_page'] == 5
+    assert data['pages'] == 3
+    assert len(data['plans']) == 5
+    
+    # Test second page
+    response = client.get('/api/v1/plans/?per_page=5&page=2')
+    data = json.loads(response.data)
+    
+    assert response.status_code == 200
+    assert data['page'] == 2
+    assert len(data['plans']) == 5
+    
+    # Test last page
+    response = client.get('/api/v1/plans/?per_page=5&page=3')
+    data = json.loads(response.data)
+    
+    assert response.status_code == 200
+    assert data['page'] == 3
+    assert len(data['plans']) == 5
+
+
 @pytest.fixture
 def admin_token(app):
-    """Create a JWT token for testing authenticated endpoints."""
+    """Create a test admin user and generate an access token."""
     with app.app_context():
-        return create_access_token(
-            identity="1",  # User ID as string
+        from app import db
+        from app.models.user import User
+        
+        # Create test admin user
+        admin = User(username="testadmin", email="admin@example.com", password="password123", is_admin=True)
+        db.session.add(admin)
+        db.session.commit()
+        
+        # Create access token with is_admin claim
+        access_token = create_access_token(
+            identity=str(admin.id),
             additional_claims={"is_admin": True}
-        ) 
+        )
+        
+        return access_token 
