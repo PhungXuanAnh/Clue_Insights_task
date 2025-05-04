@@ -9,6 +9,16 @@ This project is a Flask-based API that provides:
 - Subscription plan management
 - User subscription handling (subscribe, upgrade, cancel)
 - Optimized SQL queries for subscription-related operations
+- Multiple API versions with varying performance optimizations
+
+## API Versions
+
+### API v1
+Standard API with ORM-based database access.
+
+### API v2
+Optimized API with raw SQL queries for improved performance in high-load scenarios.
+See `app/api/v2/README.md` for detailed documentation on the v2 API.
 
 ## Technologies Used
 
@@ -194,10 +204,18 @@ This project includes several helpful make commands to streamline development:
 
 This API implements the following optimization strategies:
 
-1. Custom SQL for performance-critical operations
-2. Strategic indexing for common query patterns
-3. Optimized JOIN operations to minimize database load
-4. Efficient pagination for list operations
+1. **Custom SQL for performance-critical operations:**
+   - Raw SQL queries in v2 API endpoints for direct database access
+   - Optimized JOIN operations with careful index utilization
+   - Single-query data retrieval reducing round trips to the database
+
+2. **Strategic indexing for common query patterns**
+3. **Efficient pagination implemented at the database level**
+4. **JSON serialization optimizations for Decimal and DateTime types**
+
+For examples of these optimizations, see:
+- `app/utils/sql_optimizations.py` - Raw SQL implementations
+- `app/api/v2/` - Optimized API endpoints using raw SQL
 
 See the API documentation for detailed explanations of specific optimizations.
 
