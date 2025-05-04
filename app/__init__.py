@@ -141,6 +141,9 @@ def create_app(config_name=None):
     
     # Import v2 namespaces
     from app.api.v2.subscriptions import plan_ns as plan_ns_v2, subscription_ns as subscription_ns_v2
+    
+    # Import v3 namespaces (optimized JOIN operations)
+    from app.api.v3.subscriptions import plan_ns as plan_ns_v3, subscription_ns as subscription_ns_v3
 
     # Register namespaces with API versioning (v1)
     api.add_namespace(auth_ns_v1, path='/api/v1/auth')
@@ -150,6 +153,10 @@ def create_app(config_name=None):
     # Register namespaces with API versioning (v2)
     api.add_namespace(plan_ns_v2, path='/api/v2/plans')
     api.add_namespace(subscription_ns_v2, path='/api/v2/subscriptions')
+    
+    # Register namespaces with API versioning (v3)
+    api.add_namespace(plan_ns_v3, path='/api/v3/plans')
+    api.add_namespace(subscription_ns_v3, path='/api/v3/subscriptions')
     
     # Create a health check route
     @app.route('/health')

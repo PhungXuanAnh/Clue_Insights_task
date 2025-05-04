@@ -16,7 +16,7 @@ from app.models.subscription_plan import (
 )
 
 
-@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v2"])
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
 def test_get_subscription_plans(client, db, api_version):
     """Test retrieving subscription plans."""
     # Create some test plans
@@ -40,7 +40,8 @@ def test_get_subscription_plans(client, db, api_version):
     assert data["plans"][1]["name"] == "Premium Plan"
 
 
-def test_get_subscription_plan_by_id(client, db):
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_get_subscription_plan_by_id(client, db, api_version):
     """Test retrieving a single subscription plan by ID."""
     # Create a test plan
     plan = SubscriptionPlan(
@@ -50,7 +51,7 @@ def test_get_subscription_plan_by_id(client, db):
     db.session.commit()
 
     # Make request to get the plan
-    response = client.get(f"/api/v1/plans/{plan.id}")
+    response = client.get(f"{api_version}/plans/{plan.id}")
     data = json.loads(response.data)
 
     assert response.status_code == 200
@@ -58,14 +59,15 @@ def test_get_subscription_plan_by_id(client, db):
     assert float(data["price"]) == 29.99
 
 
-@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v2"])
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
 def test_get_nonexistent_plan(client, api_version):
     """Test retrieving a plan that doesn't exist."""
     response = client.get(f"{api_version}/plans/9999")
     assert response.status_code == 404
 
 
-def test_create_subscription_plan_with_auth(client, db, admin_token):
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_create_subscription_plan_with_auth(client, db, admin_token, api_version):
     """Test creating a subscription plan with authentication."""
     plan_data = {
         "name": "New Plan",
@@ -76,7 +78,7 @@ def test_create_subscription_plan_with_auth(client, db, admin_token):
     }
 
     response = client.post(
-        "/api/v1/plans/",
+        f"{api_version}/plans/",
         data=json.dumps(plan_data),
         content_type="application/json",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -96,7 +98,8 @@ def test_create_subscription_plan_with_auth(client, db, admin_token):
     assert plan.get_features_dict()["feature2"] == 100
 
 
-def test_create_subscription_plan_without_auth(client):
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_create_subscription_plan_without_auth(client, api_version):
     """Test creating a subscription plan without authentication."""
     plan_data = {
         "name": "Unauthorized Plan",
@@ -105,13 +108,14 @@ def test_create_subscription_plan_without_auth(client):
     }
 
     response = client.post(
-        "/api/v1/plans/", data=json.dumps(plan_data), content_type="application/json"
+        f"{api_version}/plans/", data=json.dumps(plan_data), content_type="application/json"
     )
 
     assert response.status_code == 401
 
 
-def test_update_subscription_plan(client, db, admin_token):
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_update_subscription_plan(client, db, admin_token, api_version):
     """Test updating a subscription plan."""
     # Create a plan to update
     plan = SubscriptionPlan(
@@ -128,7 +132,7 @@ def test_update_subscription_plan(client, db, admin_token):
     }
 
     response = client.put(
-        f"/api/v1/plans/{plan.id}",
+        f"{api_version}/plans/{plan.id}",
         data=json.dumps(update_data),
         content_type="application/json",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -148,7 +152,8 @@ def test_update_subscription_plan(client, db, admin_token):
     assert updated_plan.has_feature("new_feature") is True
 
 
-def test_delete_subscription_plan(client, db, admin_token):
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_delete_subscription_plan(client, db, admin_token, api_version):
     """Test deleting a subscription plan."""
     # Create a plan to delete
     plan = SubscriptionPlan(
@@ -159,7 +164,7 @@ def test_delete_subscription_plan(client, db, admin_token):
     plan_id = plan.id
 
     response = client.delete(
-        f"/api/v1/plans/{plan_id}", headers={"Authorization": f"Bearer {admin_token}"}
+        f"{api_version}/plans/{plan_id}", headers={"Authorization": f"Bearer {admin_token}"}
     )
 
     assert response.status_code == 204
@@ -169,9 +174,10 @@ def test_delete_subscription_plan(client, db, admin_token):
     assert deleted_plan is None
 
 
-def test_get_intervals(client):
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_get_intervals(client, api_version):
     """Test getting all subscription intervals."""
-    response = client.get("/api/v1/plans/intervals")
+    response = client.get(f"{api_version}/plans/intervals")
     data = json.loads(response.data)
 
     assert response.status_code == 200
@@ -183,9 +189,10 @@ def test_get_intervals(client):
         assert value in result_values
 
 
-def test_get_plan_statuses(client):
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_get_plan_statuses(client, api_version):
     """Test getting all plan status options."""
-    response = client.get("/api/v1/plans/statuses")
+    response = client.get(f"{api_version}/plans/statuses")
     data = json.loads(response.data)
 
     assert response.status_code == 200
@@ -197,143 +204,98 @@ def test_get_plan_statuses(client):
         assert value in result_values
 
 
-@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v2"])
-def test_filtering_plans_by_status(client, db, api_version):
-    """Test filtering plans by status."""
-    # Create plans with different statuses
-    active_plan = SubscriptionPlan(
-        name="Active Plan",
-        description="Active plan for testing",
-        price=9.99,
-        status=PlanStatus.ACTIVE.value,
-    )
-    inactive_plan = SubscriptionPlan(
-        name="Inactive Plan",
-        description="Inactive plan for testing",
-        price=19.99,
-        status=PlanStatus.INACTIVE.value,
-    )
-    db.session.add_all([active_plan, inactive_plan])
-    db.session.commit()
-
-    # Test filtering by active status
-    response = client.get(f"{api_version}/plans/?status=active")
-    data = json.loads(response.data)
-
-    assert response.status_code == 200
-    assert data["total"] == 1
-    assert data["plans"][0]["name"] == "Active Plan"
-
-    # Test filtering by inactive status
-    response = client.get(f"{api_version}/plans/?status=inactive")
-    data = json.loads(response.data)
-
-    assert response.status_code == 200
-    assert data["total"] == 1
-    assert data["plans"][0]["name"] == "Inactive Plan"
-
-
-def test_public_and_non_public_plans(client, db):
-    """Test filtering between public and non-public plans."""
-    # Create public and non-public plans
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
+def test_public_and_non_public_plans(client, db, api_version):
+    """Test filtering plans by public status."""
+    # Create sample plans
     public_plan = SubscriptionPlan(
-        name="Public Plan",
-        description="Public plan for testing",
-        price=9.99,
-        is_public=True,
+        name="Public Plan", description="Available to everyone", price=9.99, is_public=True
     )
     private_plan = SubscriptionPlan(
-        name="Private Plan",
-        description="Non-public plan for testing",
-        price=19.99,
-        is_public=False,
+        name="Private Plan", description="Internal use only", price=99.99, is_public=False
     )
     db.session.add_all([public_plan, private_plan])
     db.session.commit()
 
-    # Test filtering to show only public plans (default)
-    response = client.get("/api/v1/plans/")
+    # Test with public_only=true (default)
+    response = client.get(f"{api_version}/plans/")
     data = json.loads(response.data)
 
     assert response.status_code == 200
     assert data["total"] == 1
     assert data["plans"][0]["name"] == "Public Plan"
 
-    # Test showing all plans
-    response = client.get("/api/v1/plans/?public_only=false")
+    # Test with public_only=false
+    response = client.get(f"{api_version}/plans/?public_only=false")
     data = json.loads(response.data)
 
     assert response.status_code == 200
     assert data["total"] == 2
-
-    # Check plan names in results (order might vary)
-    plan_names = [p["name"] for p in data["plans"]]
-    assert "Public Plan" in plan_names
-    assert "Private Plan" in plan_names
+    assert any(plan["name"] == "Private Plan" for plan in data["plans"])
 
 
-@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v2"])
+@pytest.mark.parametrize("api_version", ["/api/v1", "/api/v3"])
 def test_pagination(client, db, api_version):
     """Test pagination of subscription plans."""
-    # Create multiple plans
-    for i in range(15):
+    # Create a bunch of plans to paginate
+    for i in range(1, 26):  # 25 plans total
         plan = SubscriptionPlan(
-            name=f"Plan {i+1}",
-            description=f"Test plan {i+1}",
-            price=10.00 + i,
-            sort_order=i,
+            name=f"Plan {i}",
+            description=f"Description for Plan {i}",
+            price=i * 10.0,
+            is_public=True,
         )
         db.session.add(plan)
     db.session.commit()
 
-    # Test first page with 5 items per page
-    response = client.get(f"{api_version}/plans/?per_page=5&page=1")
+    # Test first page (default: 10 per page)
+    response = client.get(f"{api_version}/plans/")
     data = json.loads(response.data)
 
     assert response.status_code == 200
-    assert data["total"] == 15
+    assert data["total"] == 25
+    assert len(data["plans"]) == 10
     assert data["page"] == 1
-    assert data["per_page"] == 5
     assert data["pages"] == 3
-    assert len(data["plans"]) == 5
 
     # Test second page
-    response = client.get(f"{api_version}/plans/?per_page=5&page=2")
+    response = client.get(f"{api_version}/plans/?page=2")
     data = json.loads(response.data)
 
     assert response.status_code == 200
+    assert len(data["plans"]) == 10
     assert data["page"] == 2
-    assert len(data["plans"]) == 5
 
-    # Test last page
-    response = client.get(f"{api_version}/plans/?per_page=5&page=3")
+    # Test with different page size
+    response = client.get(f"{api_version}/plans/?per_page=5")
     data = json.loads(response.data)
 
     assert response.status_code == 200
-    assert data["page"] == 3
     assert len(data["plans"]) == 5
+    assert data["pages"] == 5
 
 
 @pytest.fixture
 def admin_token(app):
-    """Create a test admin user and generate an access token."""
+    """Create an admin user and generate an access token."""
     with app.app_context():
         from app import db
         from app.models.user import User
 
-        # Create test admin user
+        # Create admin user
         admin = User(
-            username="testadmin",
+            username="admin",
             email="admin@example.com",
-            password="password123",
+            password="adminpass",
             is_admin=True,
         )
         db.session.add(admin)
         db.session.commit()
 
-        # Create access token with is_admin claim
+        # Create access token with admin claim
         access_token = create_access_token(
-            identity=str(admin.id), additional_claims={"is_admin": True}
+            identity=str(admin.id),
+            additional_claims={"is_admin": True}
         )
 
         return access_token

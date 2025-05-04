@@ -20,6 +20,7 @@ class SubscriptionStatus(enum.Enum):
     PAST_DUE = "past_due"
     PENDING = "pending"
     TRIAL = "trial"
+    CHANGED = "changed"
     
     @classmethod
     def values(cls):
@@ -100,6 +101,9 @@ class UserSubscription(BaseModel):
         
         # Add composite index for status and current_period_end for filtering by status and current_period_end
         Index('idx_user_subscriptions_status_current_period_end', 'status', 'current_period_end'),
+        
+        # New index for optimizing JOIN operations between UserSubscription and SubscriptionPlan
+        Index('idx_user_subscriptions_plan_join', 'user_id', 'plan_id', 'status'),
     )
     
     def __init__(self, user_id, plan_id, status=SubscriptionStatus.PENDING.value, 

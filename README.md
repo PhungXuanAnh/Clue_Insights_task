@@ -20,6 +20,16 @@ Standard API with ORM-based database access.
 Optimized API with raw SQL queries for improved performance in high-load scenarios.
 See `app/api/v2/README.md` for detailed documentation on the v2 API.
 
+### API v3
+Highly optimized API with the following performance enhancements:
+- In-memory caching for active subscriptions
+- Optimized JOIN operations for subscription-related queries
+- Selective column loading for reduced data transfer
+- Improved JSON serialization for numeric types
+- Strategic query optimization with eager loading techniques
+
+See `app/api/v3/subscriptions/routes.py` for implementation details.
+
 ## Technologies Used
 
 - Python 3.11
@@ -212,10 +222,23 @@ This API implements the following optimization strategies:
 2. **Strategic indexing for common query patterns**
 3. **Efficient pagination implemented at the database level**
 4. **JSON serialization optimizations for Decimal and DateTime types**
+5. **In-memory caching for frequently accessed data (v3 API):**
+   - Active subscription caching with TTL-based expiration
+   - Cache invalidation on subscription changes
+   - Configurable cache TTL settings
+
+6. **Selective column loading for reduced data transfer (v3 API):**
+   - Using SQLAlchemy's `load_only()` to request only needed columns
+   - Reducing network traffic and serialization overhead
+
+7. **Optimized JOIN strategies (v3 API):**
+   - Using `contains_eager()` and `joinedload()` to minimize database queries
+   - Proper relationship loading to avoid the N+1 query problem
 
 For examples of these optimizations, see:
 - `app/utils/sql_optimizations.py` - Raw SQL implementations
 - `app/api/v2/` - Optimized API endpoints using raw SQL
+- `app/api/v3/subscriptions/routes.py` - Advanced optimizations including caching and selective loading
 
 See the API documentation for detailed explanations of specific optimizations.
 
