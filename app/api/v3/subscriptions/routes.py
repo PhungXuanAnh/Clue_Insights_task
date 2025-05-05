@@ -44,6 +44,66 @@ from . import plan_ns, subscription_ns
 subscription_cache = {}
 CACHE_TTL = 300  # 5 minutes in seconds
 
+# --- PAGINATED LIST CACHE ---
+from functools import wraps
+
+# Cache for paginated plan lists
+plan_list_cache = {}
+# Cache for paginated subscription history per user
+subscription_history_cache = {}
+
+PAGINATED_CACHE_TTL = 300  # 5 minutes
+
+# Helper to build cache key for plans
+def build_plan_list_cache_key(page, per_page, status, public_only):
+    return f"page={page}|per_page={per_page}|status={status}|public_only={public_only}"
+
+# Helper to build cache key for subscription history
+def build_subscription_history_cache_key(user_id, page, per_page, status, from_date, to_date):
+    return f"user={user_id}|page={page}|per_page={per_page}|status={status}|from={from_date}|to={to_date}"
+
+# Cache get/set/invalidate for plans
+def get_cached_plan_list(key):
+    entry = plan_list_cache.get(key)
+    if entry and entry['expires_at'] > datetime.now(UTC).timestamp():
+        return entry['data']
+    if entry:
+        del plan_list_cache[key]
+    return None
+
+def set_cached_plan_list(key, data):
+    plan_list_cache[key] = {
+        'data': data,
+        'expires_at': datetime.now(UTC).timestamp() + PAGINATED_CACHE_TTL
+    }
+
+def invalidate_plan_list_cache():
+    plan_list_cache.clear()
+
+# Cache get/set/invalidate for subscription history
+def get_cached_subscription_history(key):
+    entry = subscription_history_cache.get(key)
+    if entry and entry['expires_at'] > datetime.now(UTC).timestamp():
+        return entry['data']
+    if entry:
+        del subscription_history_cache[key]
+    return None
+
+def set_cached_subscription_history(key, data):
+    subscription_history_cache[key] = {
+        'data': data,
+        'expires_at': datetime.now(UTC).timestamp() + PAGINATED_CACHE_TTL
+    }
+
+def invalidate_subscription_history_cache(user_id=None):
+    if user_id is None:
+        subscription_history_cache.clear()
+    else:
+        # Remove all cache entries for this user
+        keys_to_remove = [k for k in subscription_history_cache if k.startswith(f"user={user_id}|")]
+        for k in keys_to_remove:
+            del subscription_history_cache[k]
+
 def cache_active_subscription(user_id, subscription):
     """Cache the active subscription for a user."""
     subscription_cache[user_id] = {
@@ -120,13 +180,21 @@ class SubscriptionPlanList(Resource):
     })
     @plan_ns.marshal_with(plan_list_model)
     def get(self):
-        """List all subscription plans with optimized query"""
+        """List all subscription plans with optimized query and caching for first page"""
         # Get query parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         status = request.args.get('status')
         public_only = request.args.get('public_only', 'true').lower() == 'true'
-        
+
+        # Only cache first page and common per_page
+        should_cache = (page == 1 and per_page in (10, 20))
+        cache_key = build_plan_list_cache_key(page, per_page, status, public_only)
+        if should_cache:
+            cached = get_cached_plan_list(cache_key)
+            if cached:
+                return cached
+
         # Build the optimized query with selective column loading
         query = SubscriptionPlan.query.options(
             load_only(
@@ -137,25 +205,25 @@ class SubscriptionPlanList(Resource):
                 SubscriptionPlan.updated_at
             )
         )
-        
         # Apply filters
         if status:
             query = query.filter(SubscriptionPlan.status == status)
         if public_only:
             query = query.filter(SubscriptionPlan.is_public == True)
-            
         # Get paginated results, loading only essential fields
         pagination = query.order_by(SubscriptionPlan.sort_order).paginate(
             page=page, per_page=per_page
         )
-        
-        return {
+        result = {
             'plans': pagination.items,
             'total': pagination.total,
             'page': pagination.page,
             'per_page': pagination.per_page,
             'pages': pagination.pages
         }
+        if should_cache:
+            set_cached_plan_list(cache_key, result)
+        return result
     
     @plan_ns.doc('create_plan')
     @plan_ns.expect(plan_input_model)
@@ -190,7 +258,7 @@ class SubscriptionPlanList(Resource):
         
         db.session.add(plan)
         db.session.commit()
-        
+        invalidate_plan_list_cache()
         return plan, 201
 
 
@@ -247,6 +315,7 @@ class SubscriptionPlanResource(Resource):
                 plan.features = features
         
         db.session.commit()
+        invalidate_plan_list_cache()
         return plan
     
     @plan_ns.doc('delete_plan')
@@ -258,6 +327,7 @@ class SubscriptionPlanResource(Resource):
         plan = SubscriptionPlan.query.get_or_404(id)
         db.session.delete(plan)
         db.session.commit()
+        invalidate_plan_list_cache()
         return '', 204
 
 
@@ -362,6 +432,7 @@ class UserSubscriptionList(Resource):
             joinedload(UserSubscription.plan)
         ).get(subscription.id)
         
+        invalidate_subscription_history_cache(user_id)
         return subscription_with_plan, 201
 
 
@@ -424,6 +495,7 @@ class SubscriptionUpgrade(Resource):
         
         # Invalidate cache
         invalidate_subscription_cache(user_id)
+        invalidate_subscription_history_cache(user_id)
         
         return active_subscription
 
@@ -467,6 +539,7 @@ class SubscriptionCancel(Resource):
         
         # Invalidate cache
         invalidate_subscription_cache(user_id)
+        invalidate_subscription_history_cache(user_id)
         
         return subscription
 
@@ -527,14 +600,19 @@ class SubscriptionHistory(Resource):
     }))
     @jwt_required()
     def get(self):
-        """Get subscription history with optimized JOIN operations"""
+        """Get subscription history with optimized JOIN operations and caching for first page"""
         user_id = get_jwt_identity()
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         status = request.args.get('status')
         from_date = request.args.get('from_date')
         to_date = request.args.get('to_date')
-        
+        should_cache = (page == 1 and per_page in (10, 20) and not from_date and not to_date)
+        cache_key = build_subscription_history_cache_key(user_id, page, per_page, status, from_date, to_date)
+        if should_cache:
+            cached = get_cached_subscription_history(cache_key)
+            if cached:
+                return cached
         # Build query with optimized JOIN
         query = UserSubscription.query.join(UserSubscription.plan).options(
             contains_eager(UserSubscription.plan)
@@ -565,13 +643,16 @@ class SubscriptionHistory(Resource):
         # Paginate results
         pagination = query.paginate(page=page, per_page=per_page)
         
-        return {
+        result = {
             'subscriptions': pagination.items,
             'total': pagination.total,
             'page': pagination.page,
             'per_page': pagination.per_page,
             'pages': pagination.pages
         }
+        if should_cache:
+            set_cached_subscription_history(cache_key, result)
+        return result
 
 
 @subscription_ns.route('/indefinite')
@@ -638,4 +719,5 @@ class IndefiniteSubscription(Resource):
             joinedload(UserSubscription.plan)
         ).get(subscription.id)
         
+        invalidate_subscription_history_cache(user.id)
         return subscription_with_plan, 201 
