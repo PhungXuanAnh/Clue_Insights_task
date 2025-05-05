@@ -248,7 +248,57 @@ The development environment includes Flask-DebugToolbar for profiling SQL querie
 
 1. Access any HTML endpoint (like `/api/docs`) in development mode
 2. Use the SQLAlchemy panel to identify slow queries
-3. Use the Profiler panel to analyze execution times
+
+## Pagination Optimization Recommendations
+
+The following improvements are recommended to enhance pagination performance, especially as datasets grow larger:
+
+### 1. Keyset Pagination
+
+Replace current offset-based pagination with cursor-based (keyset) pagination for better performance with large datasets:
+
+- Use a unique identifier (like ID) combined with a timestamp as the cursor
+- Avoid the "count from beginning" problem of offset pagination
+- Maintain consistent performance regardless of page depth
+- Implementation should use WHERE clauses with comparison operators instead of OFFSET
+
+### 2. Database Index Optimization
+
+Create and maintain efficient indexes specifically for pagination queries:
+
+- Add composite indexes for columns used in sorting and filtering
+- Consider covering indexes that include frequently queried columns
+- Create indexes specifically for pagination filter combinations
+- Regularly analyze index usage patterns and optimize as needed
+
+### 3. Caching Strategies
+
+Implement result caching for paginated data:
+
+- Cache paginated results with appropriate TTL values
+- Use query parameters as part of cache keys
+- Implement cache invalidation when underlying data changes
+- Consider partial result caching for first few pages of common queries
+
+### 4. Count Query Optimization
+
+Improve performance of count queries used for pagination metadata:
+
+- Use approximate counts for very large datasets
+- Consider lazy/deferred counting mechanisms
+- Cache count results with appropriate invalidation
+- Implement "more results" indicators instead of exact counts where appropriate
+
+### 5. Response Size Optimization
+
+Reduce payload size for paginated responses:
+
+- Implement sparse fieldsets allowing clients to request only needed fields
+- Consider compression for large response payloads
+- Use projection queries to select only necessary columns
+- Implement view models to return only required data
+
+These recommendations can be implemented incrementally, with keyset pagination and proper indexing providing the most immediate performance benefits for large datasets.
 
 For JSON API endpoints, you can use the SQLAlchemy echo feature which logs all SQL to the console:
 ```bash
