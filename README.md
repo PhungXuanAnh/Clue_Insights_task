@@ -1,8 +1,44 @@
-# Optimized Subscription Management API
+- [1. Optimized Subscription Management API](#1-optimized-subscription-management-api)
+  - [1.1. Overview](#11-overview)
+  - [1.2. API Versions](#12-api-versions)
+    - [1.2.1. API v1](#121-api-v1)
+    - [1.2.2. API v2](#122-api-v2)
+    - [1.2.3. API v3](#123-api-v3)
+  - [1.3. Technologies Used](#13-technologies-used)
+  - [1.4. Setup and Installation](#14-setup-and-installation)
+    - [1.4.1. Prerequisites](#141-prerequisites)
+    - [1.4.2. Using Docker (Recommended)](#142-using-docker-recommended)
+    - [1.4.3. Local Development with Virtual Environment](#143-local-development-with-virtual-environment)
+  - [1.5. Testing](#15-testing)
+  - [1.6. Sample Data Creation](#16-sample-data-creation)
+  - [1.7. Project Structure](#17-project-structure)
+  - [1.8. Makefile Commands](#18-makefile-commands)
+  - [1.9. Query Optimization Strategies](#19-query-optimization-strategies)
+    - [1.9.1. Query Profiling](#191-query-profiling)
+    - [1.9.2. optimization strategies](#192-optimization-strategies)
+  - [1.10. Pagination Optimizations](#110-pagination-optimizations)
+    - [1.10.1. Implemented](#1101-implemented)
+    - [1.10.2. Future Optimizations](#1102-future-optimizations)
+      - [1.10.2.1. Keyset (Cursor) Pagination](#11021-keyset-cursor-pagination)
+      - [1.10.2.2. Count Query Optimization](#11022-count-query-optimization)
+      - [1.10.2.3. Response Size Optimization](#11023-response-size-optimization)
+      - [1.10.2.4. Distributed Caching](#11024-distributed-caching)
+      - [1.10.2.5. Advanced Caching Strategies](#11025-advanced-caching-strategies)
+      - [1.10.2.6. Query Profiling and Monitoring](#11026-query-profiling-and-monitoring)
+  - [1.11. Recommendations for Further Improvements for other features](#111-recommendations-for-further-improvements-for-other-features)
+    - [1.11.1. API \& Code Quality](#1111-api--code-quality)
+    - [1.11.2. Performance \& Scalability](#1112-performance--scalability)
+    - [1.11.3. Security](#1113-security)
+    - [1.11.4. Testing \& Reliability](#1114-testing--reliability)
+    - [1.11.5. DevOps \& Deployment](#1115-devops--deployment)
+    - [1.11.6. Feature Enhancements](#1116-feature-enhancements)
+
+
+# 1. Optimized Subscription Management API
 
 A RESTful API for managing user subscriptions with optimized SQL queries.
 
-## Overview
+## 1.1. Overview
 
 This project is a Flask-based API that provides:
 - User registration and authentication
@@ -11,16 +47,16 @@ This project is a Flask-based API that provides:
 - Optimized SQL queries for subscription-related operations
 - Multiple API versions with varying performance optimizations
 
-## API Versions
+## 1.2. API Versions
 
-### API v1
+### 1.2.1. API v1
 Standard API with ORM-based database access.
 
-### API v2
+### 1.2.2. API v2
 Optimized API with raw SQL queries for improved performance in high-load scenarios.
 See `app/api/v2/README.md` for detailed documentation on the v2 API.
 
-### API v3
+### 1.2.3. API v3
 Highly optimized API with the following performance enhancements:
 - In-memory caching for active subscriptions
 - Optimized JOIN operations for subscription-related queries
@@ -30,7 +66,7 @@ Highly optimized API with the following performance enhancements:
 
 See `app/api/v3/subscriptions/routes.py` for implementation details.
 
-## Technologies Used
+## 1.3. Technologies Used
 
 - Python 3.11
 - Flask and Flask-RESTx
@@ -39,21 +75,21 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 - JWT authentication
 - Docker and Docker Compose
 
-## Setup and Installation
+## 1.4. Setup and Installation
 
-### Prerequisites
+### 1.4.1. Prerequisites
 
 - Python 3.11
 - Docker and Docker Compose
 - MySQL client (for local development without Docker)
 - Make (for using the Makefile commands)
 
-### Using Docker (Recommended)
+### 1.4.2. Using Docker (Recommended)
 
 1. Clone the repository:
    ```
    git clone <repository-url>
-   cd subscription-management-api
+   cd Clue_Insights_task
    ```
 
 2. Use Make commands to set up and run the application:
@@ -69,19 +105,20 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
    ```
    http://localhost:5000/api/docs
    ```
+   ![](readme_images/image.png)
 
-### Local Development with Virtual Environment
+### 1.4.3. Local Development with Virtual Environment
 
 1. Clone the repository:
    ```
    git clone <repository-url>
-   cd subscription-management-api
+   cd Clue_Insights_task
    ```
 
 2. Create and activate a virtual environment:
    ```
    python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   source .venv/bin/activate
    ```
 
 3. Install dependencies:
@@ -99,18 +136,12 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
    ./install_requirements.sh dev  # Options: dev, test, prod
    ```
 
-4. Set up environment variables:
-   ```
-   cp app/.env.example .env
-   # Edit .env to set database connection details and other settings
-   ```
-
-5. Run the development server:
+4. Run the development server:
    ```
    flask run
    ```
 
-## Testing
+## 1.5. Testing
 
 Run tests using the Makefile:
 
@@ -127,22 +158,14 @@ The test command:
 2. Runs the tests in an isolated environment
 3. Automatically cleans up all test containers and volumes when done
 
-For test coverage:
+    ![](readme_images/test.png)
 
-```
-pytest --cov=app tests/
-```
-
-## Sample Data Creation
+## 1.6. Sample Data Creation
 
 To create sample subscription plans for testing and development:
 
 ```bash
-# Copy the sample data creation script to the container
-docker cp create_sample_plans.py clue_insights_task-app-1:/app/
-
-# Run the script inside the container
-docker exec -it clue_insights_task-app-1 python /app/create_sample_plans.py
+docker exec -it clue_insights_task-app-1 python /app/scripts/create_sample_plans.py
 ```
 
 This will create the following subscription plans if they don't already exist:
@@ -159,18 +182,25 @@ curl -X GET "http://localhost:5000/api/plans/" -H "accept: application/json" | j
 
 To create an admin user for testing:
 ```bash
-# Copy the admin user creation script to the container
-docker cp create_admin.py clue_insights_task-app-1:/app/
-
-# Run the script inside the container
-docker exec -it clue_insights_task-app-1 python /app/create_admin.py
+docker exec -it clue_insights_task-app-1 python /app/scripts/create_admin.py
 ```
 
 The default admin credentials are:
 - Username: admin
 - Password: admin123
 
-## Project Structure
+To generate a large dataset of 1 million users with various subscription scenarios:
+```bash
+docker exec -it clue_insights_task-app-1 python /app/scripts/create_users_data.py
+```
+
+This will create 1 million users with the following distribution:
+- 250,000 users on each of the 5 subscription plans
+- 200,000 users with subscriptions expiring soon
+- 150,000 new users (registered within the last 7 days)
+- 100,000 users who recently canceled
+
+## 1.7. Project Structure
 
 ```
 ├── app/                    # Application package
@@ -184,6 +214,10 @@ The default admin credentials are:
 │   ├── dev.txt             # Development dependencies
 │   ├── test.txt            # Testing dependencies
 │   └── prod.txt            # Production dependencies
+├── scripts/                # Utility scripts
+│   ├── create_admin.py     # Create admin user
+│   ├── create_sample_plans.py # Create subscription plans
+│   └── create_users_data.py # Generate large user dataset
 ├── tests/                  # Test suite
 │   ├── unit/               # Unit tests
 │   └── integration/        # Integration tests
@@ -198,7 +232,7 @@ The default admin credentials are:
 └── install_requirements.sh # Script to install requirements
 ```
 
-## Makefile Commands
+## 1.8. Makefile Commands
 
 This project includes several helpful make commands to streamline development:
 
@@ -210,9 +244,25 @@ This project includes several helpful make commands to streamline development:
 - `make db-migrate`: Generates a new migration (use with `message="Migration description"`)
 - `make db-upgrade`: Applies migrations to update the database schema
 
-## Query Optimization Strategies
+## 1.9. Query Optimization Strategies
 
-This API implements the following optimization strategies:
+
+### 1.9.1. Query Profiling
+
+The development environment includes Flask-DebugToolbar for profiling SQL queries:
+
+1. Access any HTML endpoint (like `/api/docs`) in development mode
+2. Use the SQLAlchemy panel to identify slow queries
+
+For JSON API endpoints, you can use the SQLAlchemy echo feature which logs all SQL to the console:
+```bash
+# View the most recent SQL queries and execution times
+docker logs --tail 100 clue_insights_task-app-1
+```
+
+See `docs/profiling_queries.md` for detailed instructions on profiling.
+
+### 1.9.2. optimization strategies
 
 1. **Custom SQL for performance-critical operations:**
    - Raw SQL queries in v2 API endpoints for direct database access
@@ -244,7 +294,9 @@ For examples of these optimizations, see:
 
 See the API documentation for detailed explanations of specific optimizations.
 
-## Pagination Optimization Recommendations
+## 1.10. Pagination Optimizations
+
+### 1.10.1. Implemented
 
 The following improvements are **implemented** to enhance pagination performance:
 
@@ -256,55 +308,70 @@ The following improvements are **implemented** to enhance pagination performance
 
 For additional recommendations and future improvements, see the next section.
 
-## Future Optimizations
+### 1.10.2. Future Optimizations
 
 The following optimizations are recommended for future work to further enhance performance, scalability, and flexibility:
 
-### 1. Keyset (Cursor) Pagination
+#### 1.10.2.1. Keyset (Cursor) Pagination
 - Replace current offset-based pagination with cursor-based (keyset) pagination for better performance with large datasets.
 - Use a unique identifier (like ID) combined with a timestamp as the cursor.
 - Avoid the "count from beginning" problem of offset pagination.
 - Maintain consistent performance regardless of page depth.
 - Implementation should use WHERE clauses with comparison operators instead of OFFSET.
 
-### 2. Count Query Optimization
+#### 1.10.2.2. Count Query Optimization
 - Use approximate counts for very large datasets.
 - Consider lazy/deferred counting mechanisms.
 - Cache count results with appropriate invalidation.
 - Implement "more results" indicators instead of exact counts where appropriate.
 
-### 3. Response Size Optimization
+#### 1.10.2.3. Response Size Optimization
 - Implement sparse fieldsets allowing clients to request only needed fields.
 - Consider compression for large response payloads.
 - Use projection queries to select only necessary columns.
 - Implement view models to return only required data.
 
-### 4. Distributed Caching
+#### 1.10.2.4. Distributed Caching
 - Move from in-memory cache to a distributed cache (e.g., Redis) for scalability in production environments.
 - Support cache invalidation across multiple app instances.
 
-### 5. Advanced Caching Strategies
+#### 1.10.2.5. Advanced Caching Strategies
 - Cache additional pages (not just the first) for high-traffic queries.
 - Implement cache warming and prefetching for common queries.
 - Use cache versioning or tagging for more granular invalidation.
 
-### 6. Query Profiling and Monitoring
+#### 1.10.2.6. Query Profiling and Monitoring
 - Automate query profiling and alerting for slow queries.
 - Integrate with monitoring tools to track cache hit/miss rates and query performance.
 
 These recommendations can be implemented incrementally, with keyset pagination and distributed caching providing the most immediate performance benefits for large datasets and production deployments.
 
-## Query Profiling
+## 1.11. Recommendations for Further Improvements for other features
 
-The development environment includes Flask-DebugToolbar for profiling SQL queries:
+### 1.11.1. API & Code Quality
+- **Consistent Error Handling:** Use a global error handler to standardize error responses (with error codes and messages) across all endpoints.
+- **Request Validation:** Consider using Marshmallow or Flask-RESTX's request parsing for stricter input validation and better error messages.
 
-1. Access any HTML endpoint (like `/api/docs`) in development mode
-2. Use the SQLAlchemy panel to identify slow queries
+### 1.11.2. Performance & Scalability
+- **Database Connection Pooling:** Ensure SQLAlchemy connection pooling is configured for production workloads.
+- **Query Profiling in CI:** Automate query profiling in your CI pipeline to catch regressions in query performance.
+- **Rate Limiting:** Add rate limiting (e.g., Flask-Limiter) to protect authentication and subscription endpoints from abuse.
 
-For JSON API endpoints, you can use the SQLAlchemy echo feature which logs all SQL to the console:
-```bash
-# View the most recent SQL queries and execution times
-docker logs --tail 100 clue_insights_task-app-1
-```
+### 1.11.3. Security
+- **Password Policies:** Enforce stronger password policies (e.g., minimum length, complexity, common password blacklist).
+- **JWT Security:** Rotate JWT secret keys regularly and consider short-lived access tokens with refresh tokens.
+- **Audit Logging:** Log sensitive actions (e.g., subscription changes, admin actions) for auditability.
 
-See `docs/profiling_queries.md` for detailed instructions on profiling.
+### 1.11.4. Testing & Reliability
+- **Test Coverage Reports:** Integrate coverage reporting (e.g., Codecov) to monitor and enforce high test coverage.
+- **Load Testing:** Use tools like Locust or k6 to simulate real-world load and identify bottlenecks.
+
+### 1.11.5. DevOps & Deployment
+- **Health Checks:** Add health check endpoints for Docker/Kubernetes readiness and liveness probes.
+- **Environment-Specific Configs:** Use environment variables and config files to separate dev, test, and prod settings.
+- **Automated Migrations:** Automate Alembic migrations as part of your deployment pipeline.
+
+### 1.11.6. Feature Enhancements
+- **Subscription Webhooks:** Add support for webhooks to notify external systems of subscription events (created, canceled, upgraded).
+- **Admin Dashboard:** Build a simple admin dashboard (even as a Flask-Admin view) for managing users and subscriptions.
+- **User Notifications:** Integrate email or in-app notifications for subscription changes, renewals, and expirations.

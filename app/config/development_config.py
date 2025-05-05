@@ -8,7 +8,7 @@ class DevelopmentConfig(BaseConfig):
     """Development environment configuration class."""
 
     DEBUG = True
-    SQLALCHEMY_ECHO = True  # Log SQL queries
+    SQLALCHEMY_ECHO = False  # Log SQL queries
     SQLALCHEMY_RECORD_QUERIES = True  # Enable query recording for Flask-DebugToolbar
     
     # Override any other settings for development
