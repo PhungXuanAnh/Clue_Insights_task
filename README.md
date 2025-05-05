@@ -224,8 +224,10 @@ This API implements the following optimization strategies:
 4. **JSON serialization optimizations for Decimal and DateTime types**
 5. **In-memory caching for frequently accessed data (v3 API):**
    - Active subscription caching with TTL-based expiration
-   - Cache invalidation on subscription changes
+   - **Paginated plan list and subscription history caching (first page, common filters) with TTL-based expiration**
+   - Cache invalidation on subscription or plan changes (create, update, delete)
    - Configurable cache TTL settings
+   - **Test isolation: cache is cleared at the start of each test request to avoid test pollution**
 
 6. **Selective column loading for reduced data transfer (v3 API):**
    - Using SQLAlchemy's `load_only()` to request only needed columns
@@ -242,63 +244,62 @@ For examples of these optimizations, see:
 
 See the API documentation for detailed explanations of specific optimizations.
 
+## Pagination Optimization Recommendations
+
+The following improvements are **implemented** to enhance pagination performance:
+
+- **[Implemented] All relevant composite indexes for filter/sort/pagination columns are present and verified in the models.**
+- **[Implemented in v3] Cache paginated results (first page, common filters) for plan lists and subscription history with appropriate TTL values**
+- **[Implemented] In test mode, cache is cleared at the start of each test request to ensure test isolation**
+- Use query parameters as part of cache keys
+- Implement cache invalidation when underlying data changes (create, update, delete)
+
+For additional recommendations and future improvements, see the next section.
+
+## Future Optimizations
+
+The following optimizations are recommended for future work to further enhance performance, scalability, and flexibility:
+
+### 1. Keyset (Cursor) Pagination
+- Replace current offset-based pagination with cursor-based (keyset) pagination for better performance with large datasets.
+- Use a unique identifier (like ID) combined with a timestamp as the cursor.
+- Avoid the "count from beginning" problem of offset pagination.
+- Maintain consistent performance regardless of page depth.
+- Implementation should use WHERE clauses with comparison operators instead of OFFSET.
+
+### 2. Count Query Optimization
+- Use approximate counts for very large datasets.
+- Consider lazy/deferred counting mechanisms.
+- Cache count results with appropriate invalidation.
+- Implement "more results" indicators instead of exact counts where appropriate.
+
+### 3. Response Size Optimization
+- Implement sparse fieldsets allowing clients to request only needed fields.
+- Consider compression for large response payloads.
+- Use projection queries to select only necessary columns.
+- Implement view models to return only required data.
+
+### 4. Distributed Caching
+- Move from in-memory cache to a distributed cache (e.g., Redis) for scalability in production environments.
+- Support cache invalidation across multiple app instances.
+
+### 5. Advanced Caching Strategies
+- Cache additional pages (not just the first) for high-traffic queries.
+- Implement cache warming and prefetching for common queries.
+- Use cache versioning or tagging for more granular invalidation.
+
+### 6. Query Profiling and Monitoring
+- Automate query profiling and alerting for slow queries.
+- Integrate with monitoring tools to track cache hit/miss rates and query performance.
+
+These recommendations can be implemented incrementally, with keyset pagination and distributed caching providing the most immediate performance benefits for large datasets and production deployments.
+
 ## Query Profiling
 
 The development environment includes Flask-DebugToolbar for profiling SQL queries:
 
 1. Access any HTML endpoint (like `/api/docs`) in development mode
 2. Use the SQLAlchemy panel to identify slow queries
-
-## Pagination Optimization Recommendations
-
-The following improvements are recommended to enhance pagination performance, especially as datasets grow larger:
-
-### 1. Keyset Pagination
-
-Replace current offset-based pagination with cursor-based (keyset) pagination for better performance with large datasets:
-
-- Use a unique identifier (like ID) combined with a timestamp as the cursor
-- Avoid the "count from beginning" problem of offset pagination
-- Maintain consistent performance regardless of page depth
-- Implementation should use WHERE clauses with comparison operators instead of OFFSET
-
-### 2. Database Index Optimization
-
-Create and maintain efficient indexes specifically for pagination queries:
-
-- Add composite indexes for columns used in sorting and filtering
-- Consider covering indexes that include frequently queried columns
-- Create indexes specifically for pagination filter combinations
-- Regularly analyze index usage patterns and optimize as needed
-
-### 3. Caching Strategies
-
-Implement result caching for paginated data:
-
-- Cache paginated results with appropriate TTL values
-- Use query parameters as part of cache keys
-- Implement cache invalidation when underlying data changes
-- Consider partial result caching for first few pages of common queries
-
-### 4. Count Query Optimization
-
-Improve performance of count queries used for pagination metadata:
-
-- Use approximate counts for very large datasets
-- Consider lazy/deferred counting mechanisms
-- Cache count results with appropriate invalidation
-- Implement "more results" indicators instead of exact counts where appropriate
-
-### 5. Response Size Optimization
-
-Reduce payload size for paginated responses:
-
-- Implement sparse fieldsets allowing clients to request only needed fields
-- Consider compression for large response payloads
-- Use projection queries to select only necessary columns
-- Implement view models to return only required data
-
-These recommendations can be implemented incrementally, with keyset pagination and proper indexing providing the most immediate performance benefits for large datasets.
 
 For JSON API endpoints, you can use the SQLAlchemy echo feature which logs all SQL to the console:
 ```bash

@@ -181,6 +181,9 @@ class SubscriptionPlanList(Resource):
     @plan_ns.marshal_with(plan_list_model)
     def get(self):
         """List all subscription plans with optimized query and caching for first page"""
+        # Clear cache in test mode to avoid test pollution
+        if current_app.config.get('TESTING'):
+            invalidate_plan_list_cache()
         # Get query parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
