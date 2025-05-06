@@ -7,7 +7,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - .:/app
+      - ./src:/app
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=development
@@ -20,10 +20,11 @@ services:
       - DB_PORT=3306
       - DB_NAME=subscription_dev_db
       - JWT_SECRET_KEY=dev_jwt_secret_key
+      - PYTHONPATH=/app
     depends_on:
       - db
     command: >
-      sh -c "flask run --host=0.0.0.0 --debug"
+      sh -c "cd /app && python app.py"
     networks:
       - app-network
     restart: unless-stopped

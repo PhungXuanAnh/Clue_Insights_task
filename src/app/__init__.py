@@ -44,9 +44,9 @@ def create_app(config_name=None):
     try:
         # Map config_name to the proper module and class
         config_mapping = {
-            'development': ('app.config.development_config', 'DevelopmentConfig'),
-            'testing': ('app.config.testing_config', 'TestingConfig'),
-            'production': ('app.config.production_config', 'ProductionConfig')
+            'development': ('src.app.config.development_config', 'DevelopmentConfig'),
+            'testing': ('src.app.config.testing_config', 'TestingConfig'),
+            'production': ('src.app.config.production_config', 'ProductionConfig')
         }
         
         if app_config in config_mapping:
@@ -58,7 +58,7 @@ def create_app(config_name=None):
         else:
             print(f"Unknown configuration: {app_config}")
             # Fall back to development config
-            config_module = importlib.import_module('app.config.development_config')
+            config_module = importlib.import_module('src.app.config.development_config')
             config_class = getattr(config_module, 'DevelopmentConfig')
             app.config.from_object(config_class)
     except Exception as e:
