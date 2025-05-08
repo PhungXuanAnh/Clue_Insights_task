@@ -5,37 +5,38 @@
     - [1.2.2. API v2](#122-api-v2)
     - [1.2.3. API v3](#123-api-v3)
   - [1.3. Technologies Used](#13-technologies-used)
-  - [1.7. Project Structure](#17-project-structure)
-  - [1.4. Setup and Installation](#14-setup-and-installation)
-    - [1.4.1. Prerequisites](#141-prerequisites)
-    - [1.4.2. Using Docker (Recommended)](#142-using-docker-recommended)
-    - [1.4.3. Local Development with Virtual Environment](#143-local-development-with-virtual-environment)
-  - [1.5. Testing](#15-testing)
-  - [1.6. Sample Data Creation](#16-sample-data-creation)
-  - [Test API using curl and jq command](#test-api-using-curl-and-jq-command)
-    - [Authentication API Examples](#authentication-api-examples)
-    - [Subscription API Examples](#subscription-api-examples)
-    - [General Tips](#general-tips)
-  - [1.8. Makefile Commands](#18-makefile-commands)
-  - [1.9. Query Optimization Strategies](#19-query-optimization-strategies)
-    - [1.9.1. Query Profiling](#191-query-profiling)
-    - [1.9.2. Optimization strategies](#192-optimization-strategies)
-  - [1.10. Pagination Optimizations](#110-pagination-optimizations)
-    - [1.10.1. Implemented](#1101-implemented)
-    - [1.10.2. Future Optimizations](#1102-future-optimizations)
-      - [1.10.2.1. Keyset (Cursor) Pagination](#11021-keyset-cursor-pagination)
-      - [1.10.2.2. Count Query Optimization](#11022-count-query-optimization)
-      - [1.10.2.3. Response Size Optimization](#11023-response-size-optimization)
-      - [1.10.2.4. Distributed Caching](#11024-distributed-caching)
-      - [1.10.2.5. Advanced Caching Strategies](#11025-advanced-caching-strategies)
-      - [1.10.2.6. Query Profiling and Monitoring](#11026-query-profiling-and-monitoring)
-  - [1.11. Recommendations other features](#111-recommendations-other-features)
-    - [1.11.1. API \& Code Quality](#1111-api--code-quality)
-    - [1.11.2. Performance \& Scalability](#1112-performance--scalability)
-    - [1.11.3. Security](#1113-security)
-    - [1.11.4. Testing \& Reliability](#1114-testing--reliability)
-    - [1.11.5. DevOps \& Deployment](#1115-devops--deployment)
-    - [1.11.6. Feature Enhancements](#1116-feature-enhancements)
+  - [1.4. Project Structure](#14-project-structure)
+  - [1.5. Setup and Installation](#15-setup-and-installation)
+    - [1.5.1. Prerequisites](#151-prerequisites)
+    - [1.5.2. Using Docker (Recommended)](#152-using-docker-recommended)
+    - [1.5.3. Local Development with Virtual Environment](#153-local-development-with-virtual-environment)
+  - [1.6. Testing](#16-testing)
+  - [1.7. Sample Data Creation](#17-sample-data-creation)
+  - [1.8. Test API using curl and jq command](#18-test-api-using-curl-and-jq-command)
+    - [1.8.1. Authentication API Examples](#181-authentication-api-examples)
+    - [1.8.2. Subscription API Examples](#182-subscription-api-examples)
+    - [1.8.3. General Tips](#183-general-tips)
+  - [1.9. Makefile Commands](#19-makefile-commands)
+  - [1.10. Query Optimization Strategies](#110-query-optimization-strategies)
+    - [1.10.1. Query Profiling using Flask debug toolbar](#1101-query-profiling-using-flask-debug-toolbar)
+    - [1.10.2. Using SQL Explain statement to debug and optimize SQL](#1102-using-sql-explain-statement-to-debug-and-optimize-sql)
+    - [1.10.3. Optimization strategies](#1103-optimization-strategies)
+  - [1.11. Pagination Optimizations](#111-pagination-optimizations)
+    - [1.11.1. Implemented](#1111-implemented)
+    - [1.11.2. Future Optimizations](#1112-future-optimizations)
+      - [1.11.2.1. Keyset (Cursor) Pagination](#11121-keyset-cursor-pagination)
+      - [1.11.2.2. Count Query Optimization](#11122-count-query-optimization)
+      - [1.11.2.3. Response Size Optimization](#11123-response-size-optimization)
+      - [1.11.2.4. Distributed Caching](#11124-distributed-caching)
+      - [1.11.2.5. Advanced Caching Strategies](#11125-advanced-caching-strategies)
+      - [1.11.2.6. Query Profiling and Monitoring](#11126-query-profiling-and-monitoring)
+  - [1.12. Recommendations other features](#112-recommendations-other-features)
+    - [1.12.1. API \& Code Quality](#1121-api--code-quality)
+    - [1.12.2. Performance \& Scalability](#1122-performance--scalability)
+    - [1.12.3. Security](#1123-security)
+    - [1.12.4. Testing \& Reliability](#1124-testing--reliability)
+    - [1.12.5. DevOps \& Deployment](#1125-devops--deployment)
+    - [1.12.6. Feature Enhancements](#1126-feature-enhancements)
 
 
 # 1. Optimized Subscription Management API
@@ -80,7 +81,7 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 - Docker and Docker Compose
 
 
-## 1.7. Project Structure
+## 1.4. Project Structure
 
 ```
 ├── app/                    # Application package
@@ -112,16 +113,16 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 └── install_requirements.sh # Script to install requirements
 ```
 
-## 1.4. Setup and Installation
+## 1.5. Setup and Installation
 
-### 1.4.1. Prerequisites
+### 1.5.1. Prerequisites
 
 - Python 3.11
 - Docker and Docker Compose
 - MySQL client (for local development without Docker)
 - Make (for using the Makefile commands)
 
-### 1.4.2. Using Docker (Recommended)
+### 1.5.2. Using Docker (Recommended)
 
 1. Clone the repository:
    ```
@@ -144,7 +145,7 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
    ```
    ![](readme_images/image.png)
 
-### 1.4.3. Local Development with Virtual Environment
+### 1.5.3. Local Development with Virtual Environment
 
 1. Clone the repository:
    ```
@@ -178,7 +179,7 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
    flask run
    ```
 
-## 1.5. Testing
+## 1.6. Testing
 
 Run tests using the Makefile:
 
@@ -197,7 +198,7 @@ The test command:
 
     ![](readme_images/test.png)
 
-## 1.6. Sample Data Creation
+## 1.7. Sample Data Creation
 
 To create sample subscription plans for testing and development:
 
@@ -244,9 +245,9 @@ email
 docker exec -it clue_insights_task-app-1 python scripts/create_users_data.py --number_usemail
 ```
 
-## Test API using curl and jq command
+## 1.8. Test API using curl and jq command
 
-### Authentication API Examples
+### 1.8.1. Authentication API Examples
 
 1. **Register a new user**:
 ```bash
@@ -274,7 +275,7 @@ curl -X POST http://localhost:5000/api/v1/auth/logout \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" | jq
 ```
 
-### Subscription API Examples
+### 1.8.2. Subscription API Examples
 
 1. **Get subscription plans**:
 ```bash
@@ -296,7 +297,7 @@ curl -X GET http://localhost:5000/api/v1/subscriptions/user \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" | jq
 ```
 
-### General Tips
+### 1.8.3. General Tips
 
 1. Store tokens in variables for easier use:
 ```bash
@@ -323,7 +324,7 @@ curl -X 'GET' \
   | jq
 ```
 
-## 1.8. Makefile Commands
+## 1.9. Makefile Commands
 
 This project includes several helpful make commands to streamline development:
 
@@ -336,10 +337,10 @@ This project includes several helpful make commands to streamline development:
 - `make db-upgrade`: Applies migrations to update the database schema
 - `db-create-sample-data`: Create sample data for testing
 
-## 1.9. Query Optimization Strategies
+## 1.10. Query Optimization Strategies
 
 
-### 1.9.1. Query Profiling
+### 1.10.1. Query Profiling using Flask debug toolbar
 
 The development environment includes Flask-DebugToolbar for profiling SQL queries:
 
@@ -350,7 +351,11 @@ See [docs/profiling_queries.md](docs/profiling_queries.md) for detailed instruct
 
 **NOTE**: this toolbar only work with HTML response, so to use it to test API with json response, I registered a function to wrap JSON responses in HTML when `_debug=true` is in the URL params, see this file for more detail [src/app/__init__.py](src/app/__init__.py)
 
-### 1.9.2. Optimization strategies
+### 1.10.2. Using SQL Explain statement to debug and optimize SQL 
+
+The `EXPLAIN` statement in SQL is used to understand how a database executes a query. It provides insight into the query execution plan, helping to optimize and debug the query.
+
+### 1.10.3. Optimization strategies
 
 1. **Custom SQL for performance-critical operations:**
    - Raw SQL queries in v2 API endpoints for direct database access
@@ -382,9 +387,9 @@ For examples of these optimizations, see:
 
 See the API documentation for detailed explanations of specific optimizations.
 
-## 1.10. Pagination Optimizations
+## 1.11. Pagination Optimizations
 
-### 1.10.1. Implemented
+### 1.11.1. Implemented
 
 The following improvements are **implemented** to enhance pagination performance:
 
@@ -396,70 +401,70 @@ The following improvements are **implemented** to enhance pagination performance
 
 For additional recommendations and future improvements, see the next section.
 
-### 1.10.2. Future Optimizations
+### 1.11.2. Future Optimizations
 
 The following optimizations are recommended for future work to further enhance performance, scalability, and flexibility:
 
-#### 1.10.2.1. Keyset (Cursor) Pagination
+#### 1.11.2.1. Keyset (Cursor) Pagination
 - Replace current offset-based pagination with cursor-based (keyset) pagination for better performance with large datasets.
 - Use a unique identifier (like ID) combined with a timestamp as the cursor.
 - Avoid the "count from beginning" problem of offset pagination.
 - Maintain consistent performance regardless of page depth.
 - Implementation should use WHERE clauses with comparison operators instead of OFFSET.
 
-#### 1.10.2.2. Count Query Optimization
+#### 1.11.2.2. Count Query Optimization
 - Use approximate counts for very large datasets.
 - Consider lazy/deferred counting mechanisms.
 - Cache count results with appropriate invalidation.
 - Implement "more results" indicators instead of exact counts where appropriate.
 
-#### 1.10.2.3. Response Size Optimization
+#### 1.11.2.3. Response Size Optimization
 - Implement sparse fieldsets allowing clients to request only needed fields.
 - Consider compression for large response payloads.
 - Use projection queries to select only necessary columns.
 - Implement view models to return only required data.
 
-#### 1.10.2.4. Distributed Caching
+#### 1.11.2.4. Distributed Caching
 - Move from in-memory cache to a distributed cache (e.g., Redis) for scalability in production environments.
 - Support cache invalidation across multiple app instances.
 
-#### 1.10.2.5. Advanced Caching Strategies
+#### 1.11.2.5. Advanced Caching Strategies
 - Cache additional pages (not just the first) for high-traffic queries.
 - Implement cache warming and prefetching for common queries.
 - Use cache versioning or tagging for more granular invalidation.
 
-#### 1.10.2.6. Query Profiling and Monitoring
+#### 1.11.2.6. Query Profiling and Monitoring
 - Automate query profiling and alerting for slow queries.
 - Integrate with monitoring tools to track cache hit/miss rates and query performance.
 
 These recommendations can be implemented incrementally, with keyset pagination and distributed caching providing the most immediate performance benefits for large datasets and production deployments.
 
-## 1.11. Recommendations other features
+## 1.12. Recommendations other features
 
-### 1.11.1. API & Code Quality
+### 1.12.1. API & Code Quality
 - **Consistent Error Handling:** Use a global error handler to standardize error responses (with error codes and messages) across all endpoints.
 - **Request Validation:** Consider using Marshmallow or Flask-RESTX's request parsing for stricter input validation and better error messages.
 
-### 1.11.2. Performance & Scalability
+### 1.12.2. Performance & Scalability
 - **Database Connection Pooling:** Ensure SQLAlchemy connection pooling is configured for production workloads.
 - **Query Profiling in CI:** Automate query profiling in your CI pipeline to catch regressions in query performance.
 - **Rate Limiting:** Add rate limiting (e.g., Flask-Limiter) to protect authentication and subscription endpoints from abuse.
 
-### 1.11.3. Security
+### 1.12.3. Security
 - **Password Policies:** Enforce stronger password policies (e.g., minimum length, complexity, common password blacklist).
 - **JWT Security:** Rotate JWT secret keys regularly and consider short-lived access tokens with refresh tokens.
 - **Audit Logging:** Log sensitive actions (e.g., subscription changes, admin actions) for auditability.
 
-### 1.11.4. Testing & Reliability
+### 1.12.4. Testing & Reliability
 - **Test Coverage Reports:** Integrate coverage reporting (e.g., Codecov) to monitor and enforce high test coverage.
 - **Load Testing:** Use tools like Locust or k6 to simulate real-world load and identify bottlenecks.
 
-### 1.11.5. DevOps & Deployment
+### 1.12.5. DevOps & Deployment
 - **Health Checks:** Add health check endpoints for Docker/Kubernetes readiness and liveness probes.
 - **Environment-Specific Configs:** Use environment variables and config files to separate dev, test, and prod settings.
 - **Automated Migrations:** Automate Alembic migrations as part of your deployment pipeline.
 
-### 1.11.6. Feature Enhancements
+### 1.12.6. Feature Enhancements
 - **Subscription Webhooks:** Add support for webhooks to notify external systems of subscription events (created, canceled, upgraded).
 - **Admin Dashboard:** Build a simple admin dashboard (even as a Flask-Admin view) for managing users and subscriptions.
 - **User Notifications:** Integrate email or in-app notifications for subscription changes, renewals, and expirations.
