@@ -5,13 +5,17 @@
     - [1.2.2. API v2](#122-api-v2)
     - [1.2.3. API v3](#123-api-v3)
   - [1.3. Technologies Used](#13-technologies-used)
+  - [1.7. Project Structure](#17-project-structure)
   - [1.4. Setup and Installation](#14-setup-and-installation)
     - [1.4.1. Prerequisites](#141-prerequisites)
     - [1.4.2. Using Docker (Recommended)](#142-using-docker-recommended)
     - [1.4.3. Local Development with Virtual Environment](#143-local-development-with-virtual-environment)
   - [1.5. Testing](#15-testing)
   - [1.6. Sample Data Creation](#16-sample-data-creation)
-  - [1.7. Project Structure](#17-project-structure)
+  - [Test API using curl and jq command](#test-api-using-curl-and-jq-command)
+    - [Authentication API Examples](#authentication-api-examples)
+    - [Subscription API Examples](#subscription-api-examples)
+    - [General Tips](#general-tips)
   - [1.8. Makefile Commands](#18-makefile-commands)
   - [1.9. Query Optimization Strategies](#19-query-optimization-strategies)
     - [1.9.1. Query Profiling](#191-query-profiling)
@@ -74,6 +78,39 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 - MySQL database
 - JWT authentication
 - Docker and Docker Compose
+
+
+## 1.7. Project Structure
+
+```
+├── app/                    # Application package
+│   ├── api/                # API endpoints
+│   ├── auth/               # Authentication logic
+│   ├── models/             # Database models
+│   ├── utils/              # Utility functions
+│   └── config/             # Configuration modules
+├── requirements/           # Requirements for different environments
+│   ├── base.txt            # Base dependencies
+│   ├── dev.txt             # Development dependencies
+│   ├── test.txt            # Testing dependencies
+│   └── prod.txt            # Production dependencies
+├── scripts/                # Utility scripts
+│   ├── create_admin.py     # Create admin user
+│   ├── create_sample_plans.py # Create subscription plans
+│   └── create_users_data.py # Generate large user dataset
+├── tests/                  # Test suite
+│   ├── unit/               # Unit tests
+│   └── integration/        # Integration tests
+├── docs/                   # Documentation files
+│   └── profiling_queries.md # Guide for query profiling
+├── init-db/                # Database initialization scripts
+├── docker-compose.yml      # Docker Compose configuration for development
+├── docker-compose.test.yml # Docker Compose configuration for testing
+├── Makefile                # Makefile with common commands
+├── app.py                  # Application entry point
+├── Dockerfile              # Docker build instructions
+└── install_requirements.sh # Script to install requirements
+```
 
 ## 1.4. Setup and Installation
 
@@ -203,40 +240,87 @@ This will create 1 million users with the following distribution:
 **NOTE**: the above command will create 1 million users, so it will take a long time. To make it quicker, you can specify number of user to create in above command, for example:
 
 ```bash
-
-docker exec -it clue_insights_task-app-1 python scripts/create_users_data.py --number_user=100
+email
+docker exec -it clue_insights_task-app-1 python scripts/create_users_data.py --number_usemail
 ```
 
-## 1.7. Project Structure
+## Test API using curl and jq command
 
+### Authentication API Examples
+
+1. **Register a new user**:
+```bash
+curl -X POST http://localhost:5000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "email": "test@example.com", "password": "password123"}' | jq
 ```
-├── app/                    # Application package
-│   ├── api/                # API endpoints
-│   ├── auth/               # Authentication logic
-│   ├── models/             # Database models
-│   ├── utils/              # Utility functions
-│   └── config/             # Configuration modules
-├── requirements/           # Requirements for different environments
-│   ├── base.txt            # Base dependencies
-│   ├── dev.txt             # Development dependencies
-│   ├── test.txt            # Testing dependencies
-│   └── prod.txt            # Production dependencies
-├── scripts/                # Utility scripts
-│   ├── create_admin.py     # Create admin user
-│   ├── create_sample_plans.py # Create subscription plans
-│   └── create_users_data.py # Generate large user dataset
-├── tests/                  # Test suite
-│   ├── unit/               # Unit tests
-│   └── integration/        # Integration tests
-├── docs/                   # Documentation files
-│   └── profiling_queries.md # Guide for query profiling
-├── init-db/                # Database initialization scripts
-├── docker-compose.yml      # Docker Compose configuration for development
-├── docker-compose.test.yml # Docker Compose configuration for testing
-├── Makefile                # Makefile with common commands
-├── app.py                  # Application entry point
-├── Dockerfile              # Docker build instructions
-└── install_requirements.sh # Script to install requirements
+
+2. **Login with username and password**:
+```bash
+curl -X POST http://localhost:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "password123"}' | jq
+```
+
+3. **Refresh an access token**:
+```bash
+curl -X POST http://localhost:5000/api/v1/auth/refresh \
+  -H "Authorization: Bearer YOUR_REFRESH_TOKEN" | jq
+```
+
+4. **Logout (revoke token)**:
+```bash
+curl -X POST http://localhost:5000/api/v1/auth/logout \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" | jq
+```
+
+### Subscription API Examples
+
+1. **Get subscription plans**:
+```bash
+curl -X GET http://localhost:5000/api/v1/subscriptions/plans \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" | jq
+```
+
+2. **Subscribe to a plan**:
+```bash
+curl -X POST http://localhost:5000/api/v1/subscriptions/subscribe \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{"plan_id": 1}' | jq
+```
+
+3. **Get user subscriptions**:
+```bash
+curl -X GET http://localhost:5000/api/v1/subscriptions/user \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" | jq
+```
+
+### General Tips
+
+1. Store tokens in variables for easier use:
+```bash
+# Login and save tokens
+TOKENS=$(curl -s -X POST http://localhost:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "password123"}')
+
+# Extract tokens
+ACCESS_TOKEN=$(echo $TOKENS | jq -r '.access_token')
+REFRESH_TOKEN=$(echo $TOKENS | jq -r '.refresh_token')
+
+# Use tokens in subsequent requests
+curl -X GET http://localhost:5000/api/v1/subscriptions/plans \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq
+```
+
+2. Testing with different APIs using token, for example api get subscriptions history
+```bash
+curl -X 'GET' \
+  'http://localhost:5000/api/v1/subscriptions/history?page=1&per_page=10' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  | jq
 ```
 
 ## 1.8. Makefile Commands
@@ -379,3 +463,4 @@ These recommendations can be implemented incrementally, with keyset pagination a
 - **Subscription Webhooks:** Add support for webhooks to notify external systems of subscription events (created, canceled, upgraded).
 - **Admin Dashboard:** Build a simple admin dashboard (even as a Flask-Admin view) for managing users and subscriptions.
 - **User Notifications:** Integrate email or in-app notifications for subscription changes, renewals, and expirations.
+- **Email verification:** Add feature email verification when register account.
