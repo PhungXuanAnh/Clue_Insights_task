@@ -90,3 +90,11 @@ db-show-indexes:
 	docker exec -it clue_insights_task-db-1 mysql -uuser -ppassword -e "USE subscription_dev_db; SHOW INDEXES FROM subscription_plans;"
 	docker exec -it clue_insights_task-db-1 mysql -uuser -ppassword -e "USE subscription_dev_db; SHOW INDEXES FROM user_subscriptions;"
 	@echo "Indexes displayed successfully."
+
+db-create-sample-data:
+	@echo "Creating sample data..."
+	docker exec -it clue_insights_task-app-1 python scripts/create_sample_plans.py
+	docker exec -it clue_insights_task-app-1 python scripts/create_users_data.py --number_user=100
+	docker exec -it clue_insights_task-app-1 python scripts/create_admin.py
+	@echo "Sample data created successfully."
+

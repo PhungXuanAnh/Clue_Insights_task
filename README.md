@@ -15,7 +15,7 @@
   - [1.8. Makefile Commands](#18-makefile-commands)
   - [1.9. Query Optimization Strategies](#19-query-optimization-strategies)
     - [1.9.1. Query Profiling](#191-query-profiling)
-    - [1.9.2. optimization strategies](#192-optimization-strategies)
+    - [1.9.2. Optimization strategies](#192-optimization-strategies)
   - [1.10. Pagination Optimizations](#110-pagination-optimizations)
     - [1.10.1. Implemented](#1101-implemented)
     - [1.10.2. Future Optimizations](#1102-future-optimizations)
@@ -25,7 +25,7 @@
       - [1.10.2.4. Distributed Caching](#11024-distributed-caching)
       - [1.10.2.5. Advanced Caching Strategies](#11025-advanced-caching-strategies)
       - [1.10.2.6. Query Profiling and Monitoring](#11026-query-profiling-and-monitoring)
-  - [1.11. Recommendations for Further Improvements for other features](#111-recommendations-for-further-improvements-for-other-features)
+  - [1.11. Recommendations other features](#111-recommendations-other-features)
     - [1.11.1. API \& Code Quality](#1111-api--code-quality)
     - [1.11.2. Performance \& Scalability](#1112-performance--scalability)
     - [1.11.3. Security](#1113-security)
@@ -200,6 +200,13 @@ This will create 1 million users with the following distribution:
 - 150,000 new users (registered within the last 7 days)
 - 100,000 users who recently canceled
 
+**NOTE**: the above command will create 1 million users, so it will take a long time. To make it quicker, you can specify number of user to create in above command, for example:
+
+```bash
+
+docker exec -it clue_insights_task-app-1 python scripts/create_users_data.py --number_user=100
+```
+
 ## 1.7. Project Structure
 
 ```
@@ -243,6 +250,7 @@ This project includes several helpful make commands to streamline development:
 - `make db-init`: Initializes database migrations (creates migrations directory)
 - `make db-migrate`: Generates a new migration (use with `message="Migration description"`)
 - `make db-upgrade`: Applies migrations to update the database schema
+- `db-create-sample-data`: Create sample data for testing
 
 ## 1.9. Query Optimization Strategies
 
@@ -251,18 +259,14 @@ This project includes several helpful make commands to streamline development:
 
 The development environment includes Flask-DebugToolbar for profiling SQL queries:
 
-1. Access any HTML endpoint (like `/api/docs`) in development mode
+1. Access any APIs with parameter `_debug=true` in development mode
 2. Use the SQLAlchemy panel to identify slow queries
 
-For JSON API endpoints, you can use the SQLAlchemy echo feature which logs all SQL to the console:
-```bash
-# View the most recent SQL queries and execution times
-docker logs --tail 100 clue_insights_task-app-1
-```
+See [docs/profiling_queries.md](docs/profiling_queries.md) for detailed instructions on profiling.
 
-See `docs/profiling_queries.md` for detailed instructions on profiling.
+**NOTE**: this toolbar only work with HTML response, so to use it to test API with json response, I registered a function to wrap JSON responses in HTML when `_debug=true` is in the URL params, see this file for more detail [src/app/__init__.py](src/app/__init__.py)
 
-### 1.9.2. optimization strategies
+### 1.9.2. Optimization strategies
 
 1. **Custom SQL for performance-critical operations:**
    - Raw SQL queries in v2 API endpoints for direct database access
@@ -346,7 +350,7 @@ The following optimizations are recommended for future work to further enhance p
 
 These recommendations can be implemented incrementally, with keyset pagination and distributed caching providing the most immediate performance benefits for large datasets and production deployments.
 
-## 1.11. Recommendations for Further Improvements for other features
+## 1.11. Recommendations other features
 
 ### 1.11.1. API & Code Quality
 - **Consistent Error Handling:** Use a global error handler to standardize error responses (with error codes and messages) across all endpoints.
