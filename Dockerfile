@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /src
 
 ARG ENVIRONMENT=dev
 ENV ENVIRONMENT=${ENVIRONMENT}
@@ -28,4 +28,5 @@ RUN if [ "$ENVIRONMENT" = "dev" ]; then \
 
 EXPOSE 5000
 
+COPY src/* /src/
 CMD ["python", "app.py"] 

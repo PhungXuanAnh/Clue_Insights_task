@@ -187,6 +187,14 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 
 Run tests using the Makefile:
 
+Build test image:
+
+```bash
+make test-build-image
+```
+
+Run test using this command:
+
 ```bash
 # Run all tests
 make test
