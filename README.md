@@ -130,7 +130,7 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 
 1. Clone the repository:
    ```
-   git clone <repository-url>
+   git clone git@github.com:PhungXuanAnh/Clue_Insights_task.git
    cd Clue_Insights_task
    ```
 
@@ -153,7 +153,7 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 
 1. Clone the repository:
    ```
-   git clone <repository-url>
+   git clone git@github.com:PhungXuanAnh/Clue_Insights_task.git
    cd Clue_Insights_task
    ```
 

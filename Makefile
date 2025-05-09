@@ -21,7 +21,7 @@ setup:
 # Run development server
 run:
 	@echo "Starting development server..."
-	docker compose up
+	docker compose up -d
 
 test-build-image:
 	@echo "Building test image..."
