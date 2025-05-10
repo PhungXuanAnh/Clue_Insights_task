@@ -223,6 +223,8 @@ make test
 TEST_CASE=/tests/unit/test_config.py make test
 ```
 
+**NOTE**: you need to wait a few seconds to create test db
+
 The test command:
 1. Starts a dedicated test database container
 2. Runs the tests in an isolated environment
