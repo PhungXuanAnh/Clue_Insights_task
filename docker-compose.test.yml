@@ -28,11 +28,8 @@ services:
     depends_on:
       test-db:
         condition: service_healthy
-    # command: >
-    #   sh -c "cd /src && pytest -v ${PYTEST_ARGS} ${TEST_CASE:-/tests/}"
-    # infinite loop command
     command: >
-      sh -c "while true; do sleep 1; done"
+      sh -c "cd /src && pytest -v ${PYTEST_ARGS} ${TEST_CASE:-/tests/}"
     networks:
       - test-network
 
