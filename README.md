@@ -11,7 +11,7 @@
     - [1.5.2. Using Docker (Recommended)](#152-using-docker-recommended)
     - [1.5.3. Local Development with Virtual Environment](#153-local-development-with-virtual-environment)
   - [1.6. Testing](#16-testing)
-  - [1.7. Sample Data Creation](#17-sample-data-creation)
+  - [1.7. Create Sample Data](#17-create-sample-data)
   - [1.8. Call APIs using Swagger UI](#18-call-apis-using-swagger-ui)
     - [1.8.1. Register](#181-register)
     - [1.8.2. Login](#182-login)
@@ -134,20 +134,28 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
    cd Clue_Insights_task
    ```
 
-2. Use Make commands to set up and run the application:
+2. Build docker image and run services
    ```
-   # Set up the development environment
-   make setup
+   # Build docker image
+   docker compose build
    
    # Run the development server
-   make run
+   docker compose up -d
    ```
 
-3. Access the API documentation at:
+3. Upgrade db
+
+  ```
+  make db-upgrade
+  ```
+
+4. Access the API documentation at:
    ```
    http://localhost:5000/api/docs
    ```
    ![](readme_images/image.png)
+
+5. To test these APIs, you need to create sample data, see this part [1.7. Create Sample Data](#17-create-sample-data)
 
 ### 1.5.3. Local Development with Virtual Environment
 
@@ -210,12 +218,18 @@ The test command:
 
     ![](readme_images/test.png)
 
-## 1.7. Sample Data Creation
+## 1.7. Create Sample Data
+
+Run upgrade db again to ensure tables are created:
+
+```bash
+make db-upgrade
+```
 
 To create sample subscription plans for testing and development:
 
 ```bash
-docker exec -it clue_insights_task-app-1 python /app/scripts/create_sample_plans.py
+docker exec -it clue_insights_task-app-1 python /src/scripts/create_sample_plans.py
 ```
 
 This will create the following subscription plans if they don't already exist:
@@ -226,13 +240,14 @@ This will create the following subscription plans if they don't already exist:
 - Pro Plan (Annual, $299.99)
 
 You can verify the created plans by accessing the API endpoint:
-```
-curl -X GET "http://localhost:5000/api/plans/" -H "accept: application/json" | jq
+
+```bash
+curl -X GET "http://localhost:5000/api/v1/plans/" -H "accept: application/json" | jq
 ```
 
 To create an admin user for testing:
 ```bash
-docker exec -it clue_insights_task-app-1 python /app/scripts/create_admin.py
+docker exec -it clue_insights_task-app-1 python /src/scripts/create_admin.py
 ```
 
 The default admin credentials are:
@@ -240,8 +255,9 @@ The default admin credentials are:
 - Password: admin123
 
 To generate a large dataset of 1 million users with various subscription scenarios:
+
 ```bash
-docker exec -it clue_insights_task-app-1 python /app/scripts/create_users_data.py
+docker exec -it clue_insights_task-app-1 python /src/scripts/create_users_data.py
 ```
 
 This will create 1 million users with the following distribution:
@@ -253,8 +269,7 @@ This will create 1 million users with the following distribution:
 **NOTE**: the above command will create 1 million users, so it will take a long time. To make it quicker, you can specify number of user to create in above command, for example:
 
 ```bash
-email
-docker exec -it clue_insights_task-app-1 python scripts/create_users_data.py --number_usemail
+docker exec -it clue_insights_task-app-1 python scripts/create_users_data.py --number_user 100
 ```
 
 ## 1.8. Call APIs using Swagger UI
