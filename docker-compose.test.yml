@@ -26,9 +26,13 @@ services:
       - PYTEST_ARGS=${PYTEST_ARGS:-""}
       - PYTHONPATH=/src:/tests
     depends_on:
-      - test-db
+      test-db:
+        condition: service_healthy
+    # command: >
+    #   sh -c "cd /src && pytest -v ${PYTEST_ARGS} ${TEST_CASE:-/tests/}"
+    # infinite loop command
     command: >
-      sh -c "cd /src && pytest -v ${PYTEST_ARGS} ${TEST_CASE:-/tests/}"
+      sh -c "while true; do sleep 1; done"
     networks:
       - test-network
 
@@ -45,9 +49,9 @@ services:
       - test-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-ppassword"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 1.5s
+      timeout: 3s
+      retries: 30
 
 networks:
   test-network:

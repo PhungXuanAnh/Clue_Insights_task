@@ -127,6 +127,7 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 - Docker and Docker Compose
 - MySQL client (for local development without Docker)
 - Make (for using the Makefile commands)
+- OS: Ubuntu 22.04
 
 ### 1.5.2. Using Docker (Recommended)
 
@@ -219,7 +220,7 @@ Run test using this command:
 make test
 
 # Run a specific test or test directory
-TEST_CASE=tests/unit/test_config.py make test
+TEST_CASE=/tests/unit/test_config.py make test
 ```
 
 The test command:

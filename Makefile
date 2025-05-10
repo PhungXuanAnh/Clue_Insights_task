@@ -31,29 +31,7 @@ test-build-image:
 test:
 	@echo "Running tests..."
 	@echo "TEST_CASE = ${TEST_CASE}"
-	
-	# Start test database first and wait for it to be ready
-	docker compose -f docker-compose.test.yml up -d test-db
-	@echo "Waiting for test database to be ready..."
-	@MAX_RETRIES=60; \
-	RETRIES=0; \
-	docker exec clue_insights_task-test-db-1 bash -c 'echo -e "[client]\nuser=user\npassword=password" > /tmp/my.cnf && chmod 600 /tmp/my.cnf'; \
-	until docker exec clue_insights_task-test-db-1 mysqladmin --defaults-file=/tmp/my.cnf -h localhost ping --silent 2>/dev/null || [ $$RETRIES -eq $$MAX_RETRIES ]; do \
-		echo "Waiting for database to be ready... $$RETRIES/$$MAX_RETRIES"; \
-		sleep 1; \
-		RETRIES=$$((RETRIES+1)); \
-	done; \
-	docker exec clue_insights_task-test-db-1 rm -f /tmp/my.cnf; \
-	if [ $$RETRIES -eq $$MAX_RETRIES ]; then \
-		echo "Database did not become ready in time"; \
-		exit 1; \
-	fi; \
-	echo "Database is ready!"
-	
-	# Then start test app and run tests
 	TEST_CASE=${TEST_CASE} PYTEST_ARGS="-p no:warnings" docker compose -f docker-compose.test.yml up --abort-on-container-exit --menu=false test-app
-	
-	# Clean up after tests
 	@echo "Tests completed. Cleaning up..."
 	make test-clean
 

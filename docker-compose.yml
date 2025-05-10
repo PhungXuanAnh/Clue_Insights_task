@@ -22,7 +22,8 @@ services:
       - JWT_SECRET_KEY=dev_jwt_secret_key
       - PYTHONPATH=/src
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command: >
       sh -c "cd /src && python app.py"
     networks:
@@ -42,6 +43,11 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 networks:
