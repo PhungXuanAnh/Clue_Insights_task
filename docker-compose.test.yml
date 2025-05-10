@@ -9,6 +9,7 @@ services:
     volumes:
       - ./src:/src
       - ./tests:/tests
+      - ./pytest.ini:/pytest.ini
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=testing
@@ -22,11 +23,12 @@ services:
       - DB_NAME=subscription_test_db
       - JWT_SECRET_KEY=test_jwt_secret_key
       - TEST_CASE=${TEST_CASE:-""}
+      - PYTEST_ARGS=${PYTEST_ARGS:-""}
       - PYTHONPATH=/src:/tests
     depends_on:
       - test-db
     command: >
-      sh -c "cd /src && pytest -v ${TEST_CASE:-/tests/}"
+      sh -c "cd /src && pytest -v ${PYTEST_ARGS} ${TEST_CASE:-/tests/}"
     networks:
       - test-network
 

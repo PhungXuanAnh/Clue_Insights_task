@@ -145,7 +145,7 @@ def test_update_subscription_plan(client, db, admin_token, api_version):
     assert float(data["price"]) == 59.99
 
     # Verify updates in database
-    updated_plan = SubscriptionPlan.query.get(plan.id)
+    updated_plan = db.session.get(SubscriptionPlan, plan.id)
     assert updated_plan.name == "Updated Plan"
     assert updated_plan.description == "Updated description"
     assert float(updated_plan.price) == 59.99
@@ -170,7 +170,7 @@ def test_delete_subscription_plan(client, db, admin_token, api_version):
     assert response.status_code == 204
 
     # Verify it's gone from the database
-    deleted_plan = SubscriptionPlan.query.get(plan_id)
+    deleted_plan = db.session.get(SubscriptionPlan, plan_id)
     assert deleted_plan is None
 
 

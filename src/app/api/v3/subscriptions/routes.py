@@ -431,9 +431,9 @@ class UserSubscriptionList(Resource):
         invalidate_subscription_cache(user_id)
         
         # Load with plan details for response
-        subscription_with_plan = UserSubscription.query.options(
+        subscription_with_plan = db.session.get(UserSubscription, subscription.id, options=[
             joinedload(UserSubscription.plan)
-        ).get(subscription.id)
+        ])
         
         invalidate_subscription_history_cache(user_id)
         return subscription_with_plan, 201

@@ -129,7 +129,7 @@ def test_upgrade_subscription(client, db, user_token, api_version):
     assert data['status'] == SubscriptionStatus.ACTIVE.value
     
     # Check that subscription was updated in database
-    updated_subscription = UserSubscription.query.get(subscription.id)
+    updated_subscription = db.session.get(UserSubscription, subscription.id)
     assert updated_subscription.plan_id == premium_plan.id
 
 
@@ -228,7 +228,7 @@ def test_downgrade_subscription(client, db, user_token, api_version):
     assert data['plan_id'] == basic_plan.id
     
     # Check that subscription was updated in database
-    updated_subscription = UserSubscription.query.get(subscription.id)
+    updated_subscription = db.session.get(UserSubscription, subscription.id)
     assert updated_subscription.plan_id == basic_plan.id
 
 
@@ -358,7 +358,7 @@ def test_cancel_subscription(client, db, user_token, api_version):
     assert data['cancel_at_period_end'] is True
     
     # Check database updates
-    updated_subscription = UserSubscription.query.get(subscription.id)
+    updated_subscription = db.session.get(UserSubscription, subscription.id)
     assert updated_subscription.status == SubscriptionStatus.ACTIVE.value
     assert updated_subscription.canceled_at is not None
     assert updated_subscription.cancel_at_period_end is True
@@ -410,7 +410,7 @@ def test_cancel_subscription_immediately(client, db, user_token, api_version):
     assert data['end_date'] is not None
     
     # Check database updates
-    updated_subscription = UserSubscription.query.get(subscription.id)
+    updated_subscription = db.session.get(UserSubscription, subscription.id)
     assert updated_subscription.status == SubscriptionStatus.CANCELED.value
     assert updated_subscription.canceled_at is not None
     assert updated_subscription.end_date is not None
