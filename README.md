@@ -53,8 +53,10 @@ This project is a Flask-based API that provides:
 - User registration and authentication
 - Subscription plan management
 - User subscription handling (subscribe, upgrade, cancel)
+- Setup Flask debug toolbar for profiling APIs and SQL
 - Optimized SQL queries for subscription-related operations
 - Multiple API versions with varying performance optimizations
+- This project was deployed in cloud, you can test it using this url: http://167.99.70.126:5000/api/docs
 
 ## 1.2. API Versions
 
@@ -129,13 +131,13 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 ### 1.5.2. Using Docker (Recommended)
 
 1. Clone the repository:
-   ```
+   ```bash
    git clone git@github.com:PhungXuanAnh/Clue_Insights_task.git
    cd Clue_Insights_task
    ```
 
 2. Build docker image and run services
-   ```
+   ```bash
    # Build docker image
    docker compose build
    
@@ -145,17 +147,26 @@ See `app/api/v3/subscriptions/routes.py` for implementation details.
 
 3. Upgrade db
 
-  ```
+  ```bash
   make db-upgrade
+  # or
+  docker compose exec app flask db upgrade
   ```
 
-4. Access the API documentation at:
+4. Create sample data
+   To test these APIs, you need to create sample data, see this part [1.7. Create Sample Data](#17-create-sample-data) for detail commands to create sample data or simply running below make command:
+   ```bash
+   make db-create-sample-data
+   ```
+
+5. Access the API documentation at:
    ```
    http://localhost:5000/api/docs
    ```
    ![](readme_images/image.png)
 
-5. To test these APIs, you need to create sample data, see this part [1.7. Create Sample Data](#17-create-sample-data)
+  - To test APIs using Swagger UI, see this section: [1.8. Call APIs using Swagger UI](#18-call-apis-using-swagger-ui)
+  - To test APIs using Curl command, see this section: [1.9. Call API using curl and jq command](#19-call-api-using-curl-and-jq-command)
 
 ### 1.5.3. Local Development with Virtual Environment
 

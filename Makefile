@@ -35,7 +35,7 @@ test:
 	# Start test database first and wait for it to be ready
 	docker compose -f docker-compose.test.yml up -d test-db
 	@echo "Waiting for test database to be ready..."
-	@MAX_RETRIES=30; \
+	@MAX_RETRIES=60; \
 	RETRIES=0; \
 	docker exec clue_insights_task-test-db-1 bash -c 'echo -e "[client]\nuser=user\npassword=password" > /tmp/my.cnf && chmod 600 /tmp/my.cnf'; \
 	until docker exec clue_insights_task-test-db-1 mysqladmin --defaults-file=/tmp/my.cnf -h localhost ping --silent 2>/dev/null || [ $$RETRIES -eq $$MAX_RETRIES ]; do \
