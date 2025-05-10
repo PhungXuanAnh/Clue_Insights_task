@@ -65,7 +65,7 @@ Standard API with ORM-based database access.
 
 ### 1.2.2. API v2
 Optimized API with raw SQL queries for improved performance in high-load scenarios.
-See `app/api/v2/README.md` for detailed documentation on the v2 API.
+See [src/app/api/v2/README.md](src/app/api/v2/README.md) for detailed documentation on the v2 API.
 
 ### 1.2.3. API v3
 Highly optimized API with the following performance enhancements:
@@ -75,7 +75,7 @@ Highly optimized API with the following performance enhancements:
 - Improved JSON serialization for numeric types
 - Strategic query optimization with eager loading techniques
 
-See `app/api/v3/subscriptions/routes.py` for implementation details.
+See [app/api/v3/subscriptions/routes.py](app/api/v3/subscriptions/routes.py) for implementation details.
 
 ## 1.3. Technologies Used
 
