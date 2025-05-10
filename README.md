@@ -56,7 +56,7 @@ This project is a Flask-based API that provides:
 - Setup Flask debug toolbar for profiling APIs and SQL
 - Optimized SQL queries for subscription-related operations
 - Multiple API versions with varying performance optimizations
-- This project was deployed in cloud, you can test it using this url: http://167.99.70.126:5000/api/docs
+- This project was deployed in cloud, you can test it using this url: http://209.97.161.84:5000/api/docs
 
 ## 1.2. API Versions
 
@@ -215,6 +215,8 @@ make test-build-image
 
 Run test using this command:
 
+**NOTE**: you need to wait a few seconds to create test db
+
 ```bash
 # Run all tests
 make test
@@ -222,8 +224,6 @@ make test
 # Run a specific test or test directory
 TEST_CASE=/tests/unit/test_config.py make test
 ```
-
-**NOTE**: you need to wait a few seconds to create test db
 
 The test command:
 1. Starts a dedicated test database container
