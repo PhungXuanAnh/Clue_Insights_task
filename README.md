@@ -410,7 +410,7 @@ The development environment includes Flask-DebugToolbar for profiling SQL querie
 
 See [docs/profiling_queries.md](docs/profiling_queries.md) for detailed instructions on profiling.
 
-**NOTE**: this toolbar only work with HTML response, so to use it to test API with json response, I registered a function to wrap JSON responses in HTML when `_debug=true` is in the URL params, see this file for more detail [src/app/__init__.py](src/app/__init__.py)
+**NOTE**: this toolbar only work with HTML response, so to use it to test API with json response, I registered a function to wrap JSON responses in HTML when `_debug=true` is in the URL params, see this file for more detail [src/app/__init__.py#L211](src/app/__init__.py#L211)
 
 ### 1.11.2. Using SQL Explain statement to debug and optimize SQL 
 
