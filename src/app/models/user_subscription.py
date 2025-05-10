@@ -178,8 +178,6 @@ class UserSubscription(BaseModel):
         Returns:
             SQLAlchemy expression: Query expression for active subscriptions
         """
-        # Using func.now() instead of datetime.now(UTC) for SQL expression
-        # This ensures the datetime is evaluated at the database level
         return and_(
             cls.status == SubscriptionStatus.ACTIVE.value,
             cls.start_date <= func.now(),
@@ -198,11 +196,7 @@ class UserSubscription(BaseModel):
             bool: True if in trial, False otherwise
         """
         now = datetime.now(UTC)
-        
-        # Handle timezone conversion if needed
         trial_end_date = self.trial_end_date
-        
-        # If datetime is naive, make it aware
         if trial_end_date and trial_end_date.tzinfo is None:
             trial_end_date = trial_end_date.replace(tzinfo=UTC)
         
@@ -218,7 +212,6 @@ class UserSubscription(BaseModel):
         Returns:
             SQLAlchemy expression: Query expression for trial subscriptions
         """
-        # Using func.now() instead of datetime.now(UTC) for SQL expression
         return and_(
             cls.status == SubscriptionStatus.TRIAL.value,
             cls.trial_end_date != None,  # noqa: E711
@@ -237,11 +230,7 @@ class UserSubscription(BaseModel):
             return None
             
         now = datetime.now(UTC)
-        
-        # Handle timezone conversion if needed
         current_period_end = self.current_period_end
-        
-        # If datetime is naive, make it aware
         if current_period_end and current_period_end.tzinfo is None:
             current_period_end = current_period_end.replace(tzinfo=UTC)
             
@@ -357,8 +346,6 @@ class UserSubscription(BaseModel):
             UserSubscription: The subscription instance
         """
         self.payment_status = status
-        
-        # If payment failed, update subscription status
         if status == PaymentStatus.FAILED.value:
             self.status = SubscriptionStatus.PAST_DUE.value
         
@@ -392,11 +379,12 @@ class UserSubscription(BaseModel):
             
         Returns:
             UserSubscription: The active subscription or None
+        
+        Optimized query that:
+            1. Uses the composite index idx_user_active_subscriptions
+            2. Eagerly loads the plan relationship to avoid N+1 query problems
+            3. Uses proper date filtering at the database level
         """
-        # Optimized query that:
-        # 1. Uses the composite index idx_user_active_subscriptions
-        # 2. Eagerly loads the plan relationship to avoid N+1 query problems
-        # 3. Uses proper date filtering at the database level
         
         now = datetime.now(UTC)
         
@@ -466,28 +454,24 @@ class UserSubscription(BaseModel):
             - Offers flexible filtering by status and date ranges
             - Sorts by most recent first to show newest subscriptions
         """
-        # Start building query with plan data eager loading
         query = cls.query.options(
-            joinedload(cls.plan)  # Eager load plan details
+            joinedload(cls.plan)
         ).filter(
             cls.user_id == user_id
         )
         
-        # Apply status filter if provided
         if status:
             if isinstance(status, list):
                 query = query.filter(cls.status.in_(status))
             else:
                 query = query.filter(cls.status == status)
         
-        # Apply date range filters if provided
         if from_date:
             query = query.filter(cls.created_at >= from_date)
         
         if to_date:
             query = query.filter(cls.created_at <= to_date)
         
-        # Return paginated result with newest subscriptions first
         return query.order_by(cls.created_at.desc()).paginate(
             page=page, per_page=per_page
         )

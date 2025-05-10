@@ -64,11 +64,18 @@ This project is a Flask-based API that provides:
 Standard API with ORM-based database access.
 
 ### 1.2.2. API v2
-Optimized API with raw SQL queries for improved performance in high-load scenarios.
-See [src/app/api/v2/README.md](src/app/api/v2/README.md) for detailed documentation on the v2 API.
+Optimized API v1 with raw SQL queries for improved performance in high-load scenarios.
+
+The v2 API improves performance over v1 by:
+
+- **Reduced Database Queries**: Single optimized queries instead of multiple ORM calls
+- **Direct Index Usage**: Efficient use of database indexes without ORM overhead
+- **Optimized Filtering**: Database-level filtering reduces memory usage
+- **Pagination at Database Level**: Efficient data retrieval for large result sets
+- **JSON Serialization Optimizations**: Efficient handling of date/time and decimal types
 
 ### 1.2.3. API v3
-Highly optimized API with the following performance enhancements:
+Highly optimized API v1 with the following performance enhancements:
 - In-memory caching for active subscriptions
 - Optimized JOIN operations for subscription-related queries
 - Selective column loading for reduced data transfer
