@@ -69,6 +69,7 @@ Optimized API v1 with raw SQL queries for improved performance in high-load scen
 The v2 API improves performance over v1 by:
 
 - **Reduced Database Queries**: Single optimized queries instead of multiple ORM calls
+  - In this project, I used a Windows function, but we could also use a materialized view for complex queries and heavy read tasks. However, we would need to handle data refreshing to prevent it from becoming stale.
 - **Direct Index Usage**: Efficient use of database indexes without ORM overhead
 - **Optimized Filtering**: Database-level filtering reduces memory usage
 - **Pagination at Database Level**: Efficient data retrieval for large result sets
