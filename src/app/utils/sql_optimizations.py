@@ -156,7 +156,7 @@ def get_subscription_history(
             pages: Total number of pages
         
     Performance optimizations:
-        - Single query for all subscription data with plans
+        - Single query for both count and data using window functions
         - Efficient pagination at the database level
         - Optimized status and date filtering
     """
@@ -186,17 +186,6 @@ def get_subscription_history(
         where_clause += " AND s.created_at <= :to_date"
         params["to_date"] = to_date.isoformat()
     
-    # Count query for pagination metadata
-    count_sql = text(f"""
-    SELECT COUNT(*) as total
-    FROM user_subscriptions s
-    WHERE {where_clause}
-    """)
-    
-    total = db.session.execute(count_sql, params).scalar()
-    pages = (total + per_page - 1) // per_page if total > 0 else 0
-    
-    # Main query for subscription data with plan details
     sql = text(f"""
     SELECT 
         s.id, s.user_id, s.plan_id, s.status, s.start_date, s.end_date, 
@@ -209,7 +198,8 @@ def get_subscription_history(
         p.status as plan_status, p.is_public as plan_is_public, 
         p.max_users as plan_max_users, p.parent_id as plan_parent_id,
         p.sort_order as plan_sort_order, p.created_at as plan_created_at, 
-        p.updated_at as plan_updated_at
+        p.updated_at as plan_updated_at,
+        COUNT(*) OVER() as total_count
     FROM user_subscriptions s
     JOIN subscription_plans p ON s.plan_id = p.id
     WHERE {where_clause}
@@ -219,6 +209,10 @@ def get_subscription_history(
     
     results = db.session.execute(sql, params).fetchall()
     
+    # Get total count from the first row if results exist
+    total = results[0].total_count if results else 0
+    pages = (total + per_page - 1) // per_page if total > 0 else 0
+    
     # Convert results to list of dictionaries
     items = []
     for result in results:
@@ -226,6 +220,10 @@ def get_subscription_history(
         plan = {}
         
         for key, value in result._mapping.items():
+            # Skip the total_count column
+            if key == 'total_count':
+                continue
+                
             if key.startswith('plan_'):
                 # Add to plan dictionary without the 'plan_' prefix
                 plan_key = key[5:]  # Remove 'plan_' prefix
