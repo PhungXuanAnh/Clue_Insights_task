@@ -261,7 +261,7 @@ def get_public_plans(
             pages: Total number of pages
         
     Performance optimizations:
-        - Single query for all plan data
+        - Single query for both count and data using window functions
         - Efficient pagination at the database level
         - Optimized status filtering
     """
@@ -272,18 +272,9 @@ def get_public_plans(
         where_clause += " AND status = :status"
         params["status"] = status
     
-    count_sql = text(f"""
-    SELECT COUNT(*) as total
-    FROM subscription_plans
-    WHERE {where_clause}
-    """)
-    
-    total = db.session.execute(count_sql, params).scalar()
-    pages = (total + per_page - 1) // per_page if total > 0 else 0
-    
-    # Main query for plan data
+    # Combined query for count and data
     sql = text(f"""
-    SELECT *
+    SELECT *, COUNT(*) OVER() as total_count
     FROM subscription_plans
     WHERE {where_clause}
     ORDER BY sort_order
@@ -292,10 +283,17 @@ def get_public_plans(
     
     results = db.session.execute(sql, params).fetchall()
     
+    # Get total count from the first row if results exist
+    total = results[0].total_count if results else 0
+    pages = (total + per_page - 1) // per_page if total > 0 else 0
+    
     items = []
     for result in results:
         plan = {}
         for key, value in result._mapping.items():
+            # Skip the total_count column
+            if key == 'total_count':
+                continue
             plan[key] = value
         items.append(plan)
     
