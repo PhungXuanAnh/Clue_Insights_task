@@ -272,7 +272,6 @@ def get_public_plans(
         where_clause += " AND status = :status"
         params["status"] = status
     
-    # Combined query for count and data
     sql = text(f"""
     SELECT *, COUNT(*) OVER() as total_count
     FROM subscription_plans
@@ -398,65 +397,48 @@ def get_subscription_stats() -> Dict:
         dict: Dictionary with various subscription statistics
         
     Performance optimizations:
-        - Uses aggregate SQL functions for efficient counting
+        - Uses a single SQL query with subqueries for all statistics
         - Gets all statistics in a single database round-trip
+        - Eliminates multiple separate queries
     """
-    active_count_sql = text("""
-    SELECT COUNT(*) as count FROM user_subscriptions
-    WHERE status = :active_status
+    stats_sql = text("""
+    SELECT
+        (SELECT COUNT(*) FROM user_subscriptions 
+         WHERE status = :active_status) as active_count,
+        
+        (SELECT COUNT(*) FROM user_subscriptions 
+         WHERE status = :trial_status
+         AND trial_end_date IS NOT NULL
+         AND trial_end_date > NOW()) as trial_count,
+        
+        (SELECT COUNT(*) FROM user_subscriptions 
+         WHERE status = :active_status
+         AND auto_renew = 0
+         AND current_period_end IS NOT NULL
+         AND current_period_end BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)) as expiring_soon_count,
+        
+        (SELECT COUNT(*) FROM user_subscriptions 
+         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) as new_count,
+        
+        (SELECT COUNT(*) FROM user_subscriptions 
+         WHERE status = :canceled_status
+         AND canceled_at IS NOT NULL
+         AND canceled_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) as recently_canceled_count
     """)
-    active_count = db.session.execute(
-        active_count_sql, 
-        {"active_status": SubscriptionStatus.ACTIVE.value}
-    ).scalar() or 0
     
-    trial_count_sql = text("""
-    SELECT COUNT(*) as count FROM user_subscriptions
-    WHERE status = :trial_status
-    AND trial_end_date IS NOT NULL
-    AND trial_end_date > NOW()
-    """)
-    trial_count = db.session.execute(
-        trial_count_sql, 
-        {"trial_status": SubscriptionStatus.TRIAL.value}
-    ).scalar() or 0
-    
-    # Calculate subscriptions expiring soon (next 7 days) that don't auto-renew
-    expiring_soon_sql = text("""
-    SELECT COUNT(*) as count FROM user_subscriptions
-    WHERE status = :active_status
-    AND auto_renew = 0
-    AND current_period_end IS NOT NULL
-    AND current_period_end BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)
-    """)
-    expiring_soon_count = db.session.execute(
-        expiring_soon_sql, 
-        {"active_status": SubscriptionStatus.ACTIVE.value}
-    ).scalar() or 0
-    
-    # Calculate new subscriptions in the last 30 days
-    new_count_sql = text("""
-    SELECT COUNT(*) as count FROM user_subscriptions
-    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    """)
-    new_count = db.session.execute(new_count_sql).scalar() or 0
-    
-    # Calculate recently canceled subscriptions (last 30 days)
-    recently_canceled_sql = text("""
-    SELECT COUNT(*) as count FROM user_subscriptions
-    WHERE status = :canceled_status
-    AND canceled_at IS NOT NULL
-    AND canceled_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    """)
-    recently_canceled_count = db.session.execute(
-        recently_canceled_sql, 
-        {"canceled_status": SubscriptionStatus.CANCELED.value}
-    ).scalar() or 0
+    result = db.session.execute(
+        stats_sql, 
+        {
+            "active_status": SubscriptionStatus.ACTIVE.value,
+            "trial_status": SubscriptionStatus.TRIAL.value,
+            "canceled_status": SubscriptionStatus.CANCELED.value
+        }
+    ).fetchone()
     
     return {
-        "active_count": active_count,
-        "trial_count": trial_count,
-        "expiring_soon_count": expiring_soon_count,
-        "new_count": new_count,
-        "recently_canceled_count": recently_canceled_count
+        "active_count": result.active_count or 0,
+        "trial_count": result.trial_count or 0,
+        "expiring_soon_count": result.expiring_soon_count or 0,
+        "new_count": result.new_count or 0,
+        "recently_canceled_count": result.recently_canceled_count or 0
     }
