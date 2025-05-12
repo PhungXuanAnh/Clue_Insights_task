@@ -3,11 +3,11 @@ V2 subscription routes that use optimized raw SQL queries for better performance
 """
 from datetime import datetime
 
-from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource, fields, reqparse
 
 from app.api.v2.subscriptions import plan_ns, subscription_ns
+from app.utils.auth import admin_required
 from app.utils.json_helpers import convert_decimal_in_dict
 from app.utils.sql_optimizations import (
     get_expiring_subscriptions,
@@ -174,21 +174,12 @@ class ExpiringSubscriptions(Resource):
     """Get subscriptions that are expiring soon (admin only)"""
 
     @jwt_required()
+    @admin_required()
     @subscription_ns.expect(expiring_parser)
     @subscription_ns.response(200, "Success")
     @subscription_ns.response(403, "Forbidden - admin access required")
     def get(self):
         """Get subscriptions that are expiring soon using optimized SQL"""
-        # This would typically check if the current user is an admin
-        # For now, we'll use a placeholder - you would replace this with your actual admin check
-        current_user_id = get_jwt_identity()
-
-        # Placeholder for admin check - replace with your actual implementation
-        is_admin = True  # Replace with actual admin check
-
-        if not is_admin:
-            subscription_ns.abort(403, "Admin access required")
-
         args = expiring_parser.parse_args()
         days = args.get("days", 7)
 
@@ -202,22 +193,13 @@ class SubscriptionStats(Resource):
     """Get subscription statistics (admin only)"""
 
     @jwt_required()
+    @admin_required()
     @subscription_ns.marshal_with(subscription_stats_model)
     @subscription_ns.response(200, "Success")
     @subscription_ns.response(403, "Forbidden - admin access required")
     def get(self):
         """Get subscription statistics using optimized SQL"""
-        # This would typically check if the current user is an admin
-        # For now, we'll use a placeholder - you would replace this with your actual admin check
-        current_user_id = get_jwt_identity()
-
-        # Placeholder for admin check - replace with your actual implementation
-        is_admin = True  # Replace with actual admin check
-
-        if not is_admin:
-            subscription_ns.abort(403, "Admin access required")
         stats = get_subscription_stats()
-
         return stats
 
 
