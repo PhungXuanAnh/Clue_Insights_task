@@ -24,6 +24,42 @@ from app.utils.auth import admin_required
 
 from . import plan_ns, subscription_ns
 
+
+def get_active_subscription_or_404(user_id):
+    """
+    Get the active subscription for a user or raise 404 error.
+    
+    Args:
+        user_id (int): The ID of the user to check.
+        
+    Returns:
+        UserSubscription: The active subscription for the user.
+        
+    Raises:
+        werkzeug.exceptions.NotFound: If no active subscription is found.
+    """
+    return UserSubscription.query.filter_by(
+        user_id=user_id,
+        status=SubscriptionStatus.ACTIVE.value
+    ).first_or_404('No active subscription found')
+
+
+def find_active_subscription(user_id):
+    """
+    Find the active subscription for a user without raising an error if not found.
+    
+    Args:
+        user_id (int): The ID of the user to check.
+        
+    Returns:
+        UserSubscription or None: The active subscription for the user, or None if not found.
+    """
+    return UserSubscription.query.filter_by(
+        user_id=user_id,
+        status=SubscriptionStatus.ACTIVE.value
+    ).first()
+
+
 interval_model = plan_ns.model('SubscriptionInterval', {
     'value': fields.String(description='Interval value', enum=[i.value for i in SubscriptionInterval]),
     'name': fields.String(description='Interval display name'),
@@ -308,10 +344,7 @@ class UserSubscriptionList(Resource):
         if plan.status != PlanStatus.ACTIVE.value:
             return {'message': 'Cannot subscribe to inactive plan'}, 400
         
-        active_subscription = UserSubscription.query.filter_by(
-            user_id=user_id,
-            status=SubscriptionStatus.ACTIVE.value
-        ).first()
+        active_subscription = find_active_subscription(user_id)
         
         if active_subscription:
             return {'message': 'User already has an active subscription'}, 400
@@ -369,10 +402,7 @@ class SubscriptionUpgrade(Resource):
         user_id = get_jwt_identity()
         data = request.json
         
-        subscription = UserSubscription.query.filter_by(
-            user_id=user_id,
-            status=SubscriptionStatus.ACTIVE.value
-        ).first_or_404('No active subscription found')
+        subscription = get_active_subscription_or_404(user_id)
         
         new_plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
         if new_plan.status != PlanStatus.ACTIVE.value:
@@ -416,10 +446,7 @@ class SubscriptionCancel(Resource):
         user_id = get_jwt_identity()
         data = request.json
         
-        subscription = UserSubscription.query.filter_by(
-            user_id=user_id,
-            status=SubscriptionStatus.ACTIVE.value
-        ).first_or_404('No active subscription found')
+        subscription = get_active_subscription_or_404(user_id)
         
         now = datetime.now(UTC)
         subscription.canceled_at = now
@@ -449,10 +476,7 @@ class ActiveSubscription(Resource):
         """Get the user's active subscription with plan details"""
         user_id = get_jwt_identity()
         
-        subscription = UserSubscription.query.filter_by(
-            user_id=user_id,
-            status=SubscriptionStatus.ACTIVE.value
-        ).first_or_404('No active subscription found')
+        subscription = get_active_subscription_or_404(user_id)
         
         return subscription
 
@@ -540,10 +564,7 @@ class IndefiniteSubscription(Resource):
         
         plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
         user = User.query.get_or_404(target_user_id)
-        active_subscription = UserSubscription.query.filter_by(
-            user_id=target_user_id,
-            status=SubscriptionStatus.ACTIVE.value
-        ).first()
+        active_subscription = find_active_subscription(target_user_id)
         
         if active_subscription:
             return {'message': 'User already has an active subscription'}, 400
