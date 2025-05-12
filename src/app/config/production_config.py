@@ -9,7 +9,7 @@ from app.config.base_config import BaseConfig
 class ProductionConfig(BaseConfig):
     """Production environment configuration class."""
 
-    # Production should never run in debug mode
+    # NOTE: Production should never run in debug mode
     DEBUG = False
     
     # Use environment variables with no defaults for production

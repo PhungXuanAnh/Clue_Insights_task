@@ -4,7 +4,7 @@ User subscription model for handling user subscriptions to plans.
 import enum
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Index, and_, desc, func, or_
+from sqlalchemy import Index, and_, func, or_
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import joinedload
 
@@ -78,7 +78,6 @@ class UserSubscription(BaseModel):
     auto_renew = db.Column(db.Boolean, nullable=False, default=True)
     subscription_metadata = db.Column(db.Text, nullable=True)
     
-    # Relationships
     user = db.relationship('User', back_populates='subscriptions')
     plan = db.relationship('SubscriptionPlan', back_populates='subscriptions')
     
@@ -155,12 +154,9 @@ class UserSubscription(BaseModel):
             bool: True if active, False otherwise
         """
         now = datetime.now(UTC)
-        
-        # Handle timezone conversion if needed
         start_date = self.start_date
         end_date = self.end_date
         
-        # If datetimes are naive, make them aware
         if start_date and start_date.tzinfo is None:
             start_date = start_date.replace(tzinfo=UTC)
         if end_date and end_date.tzinfo is None:

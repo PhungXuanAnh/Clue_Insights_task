@@ -18,10 +18,7 @@ from app import create_app, db
 from app.models import SubscriptionPlan, SubscriptionStatus, User, UserSubscription
 from app.models.user_subscription import PaymentStatus
 
-# Initialize faker for generating realistic user data
 fake = Faker()
-
-# Default total users to generate
 DEFAULT_TOTAL_USERS = 1_000_000
 
 # Distribution rates (in percentages)

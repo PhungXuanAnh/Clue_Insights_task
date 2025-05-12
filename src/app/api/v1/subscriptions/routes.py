@@ -24,19 +24,16 @@ from app.utils.auth import admin_required
 
 from . import plan_ns, subscription_ns
 
-# Define the subscription interval enum model
 interval_model = plan_ns.model('SubscriptionInterval', {
     'value': fields.String(description='Interval value', enum=[i.value for i in SubscriptionInterval]),
     'name': fields.String(description='Interval display name'),
 })
 
-# Define the plan status enum model
 plan_status_model = plan_ns.model('PlanStatus', {
     'value': fields.String(description='Status value', enum=[s.value for s in PlanStatus]),
     'name': fields.String(description='Status display name'),
 })
 
-# Define the subscription plan model for API
 plan_model = plan_ns.model('SubscriptionPlan', {
     'id': fields.Integer(description='Plan ID'),
     'name': fields.String(required=True, description='Plan name'),
@@ -57,7 +54,6 @@ plan_model = plan_ns.model('SubscriptionPlan', {
     'updated_at': fields.DateTime(description='Last update date'),
 })
 
-# Define the plan list response model
 plan_list_model = plan_ns.model('PlanList', {
     'plans': fields.List(fields.Nested(plan_model)),
     'total': fields.Integer(description='Total number of plans'),
@@ -66,7 +62,6 @@ plan_list_model = plan_ns.model('PlanList', {
     'pages': fields.Integer(description='Total number of pages')
 })
 
-# Input model for creating/updating plans
 plan_input_model = plan_ns.model('PlanInput', {
     'name': fields.String(required=True, description='Plan name'),
     'description': fields.String(required=True, description='Plan description'),
@@ -84,7 +79,6 @@ plan_input_model = plan_ns.model('PlanInput', {
     'sort_order': fields.Integer(description='Display order', default=0),
 })
 
-# Define the user subscription model for API
 subscription_model = subscription_ns.model('UserSubscription', {
     'id': fields.Integer(description='Subscription ID'),
     'user_id': fields.Integer(description='User ID'),
@@ -105,7 +99,6 @@ subscription_model = subscription_ns.model('UserSubscription', {
     'updated_at': fields.DateTime(description='Last update date'),
 })
 
-# Extended subscription model with plan details
 subscription_with_plan_model = subscription_ns.model('UserSubscriptionWithPlan', {
     'id': fields.Integer(description='Subscription ID'),
     'user_id': fields.Integer(description='User ID'),
@@ -127,7 +120,6 @@ subscription_with_plan_model = subscription_ns.model('UserSubscriptionWithPlan',
     'plan': fields.Nested(plan_model, description='Subscription plan details')
 })
 
-# Input model for creating a subscription
 subscription_input_model = subscription_ns.model('SubscriptionInput', {
     'plan_id': fields.Integer(required=True, description='Plan ID to subscribe to'),
     'quantity': fields.Integer(description='Quantity (for seat-based plans)', default=1),
@@ -135,18 +127,15 @@ subscription_input_model = subscription_ns.model('SubscriptionInput', {
     'trial_days': fields.Integer(description='Number of trial days (if applicable)', default=0)
 })
 
-# Define input model for upgrading/downgrading subscription
 plan_change_model = subscription_ns.model('PlanChangeInput', {
     'plan_id': fields.Integer(required=True, description='New plan ID to upgrade/downgrade to'),
     'prorate': fields.Boolean(description='Whether to prorate the subscription change', default=True)
 })
 
-# Define input model for canceling subscription
 cancel_subscription_model = subscription_ns.model('CancelSubscriptionInput', {
     'at_period_end': fields.Boolean(description='Whether to cancel at the end of the current period', default=True)
 })
 
-# API routes for subscription plans
 @plan_ns.route('/')
 class SubscriptionPlanList(Resource):
     """Resource for listing and creating subscription plans"""
@@ -160,22 +149,17 @@ class SubscriptionPlanList(Resource):
     @plan_ns.marshal_with(plan_list_model)
     def get(self):
         """List all subscription plans"""
-        # Get query parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         status = request.args.get('status')
         public_only = request.args.get('public_only', 'true').lower() == 'true'
         
-        # Build the query
         query = SubscriptionPlan.query
-        
-        # Apply filters
         if status:
             query = query.filter(SubscriptionPlan.status == status)
         if public_only:
             query = query.filter(SubscriptionPlan.is_public == True)
             
-        # Get paginated results
         pagination = query.order_by(SubscriptionPlan.sort_order).paginate(
             page=page, per_page=per_page
         )
@@ -196,12 +180,9 @@ class SubscriptionPlanList(Resource):
     def post(self):
         """Create a new subscription plan (admin only)"""
         data = request.json
-        
-        # Handle features as dict
         features_dict = data.pop('features', None)
         features_json = json.dumps(features_dict) if features_dict else None
         
-        # Create the new plan
         plan = SubscriptionPlan(
             name=data['name'],
             description=data['description'],
@@ -244,7 +225,6 @@ class SubscriptionPlanResource(Resource):
         plan = SubscriptionPlan.query.get_or_404(id)
         data = request.json
         
-        # Update basic fields
         plan.name = data.get('name', plan.name)
         plan.description = data.get('description', plan.description)
         plan.price = data.get('price', plan.price)
@@ -256,7 +236,6 @@ class SubscriptionPlanResource(Resource):
         plan.parent_id = data.get('parent_id', plan.parent_id)
         plan.sort_order = data.get('sort_order', plan.sort_order)
         
-        # Handle features update
         features_dict = data.get('features')
         if features_dict is not None:
             plan.features = json.dumps(features_dict)
@@ -325,12 +304,10 @@ class UserSubscriptionList(Resource):
         user_id = get_jwt_identity()
         data = request.json
         
-        # Verify the plan exists and is active
         plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
         if plan.status != PlanStatus.ACTIVE.value:
             return {'message': 'Cannot subscribe to inactive plan'}, 400
         
-        # Check if user already has an active subscription
         active_subscription = UserSubscription.query.filter_by(
             user_id=user_id,
             status=SubscriptionStatus.ACTIVE.value
@@ -339,11 +316,9 @@ class UserSubscriptionList(Resource):
         if active_subscription:
             return {'message': 'User already has an active subscription'}, 400
         
-        # Calculate dates
         now = datetime.now(UTC)
         trial_days = data.get('trial_days', 0)
         
-        # Calculate trial end date if applicable
         trial_end_date = None
         if trial_days > 0:
             trial_end_date = now + timedelta(days=trial_days)
@@ -360,7 +335,6 @@ class UserSubscriptionList(Resource):
             # Already set to 30 days
             pass
         
-        # Create the subscription
         subscription = UserSubscription(
             user_id=user_id,
             plan_id=plan.id,
@@ -395,20 +369,15 @@ class SubscriptionUpgrade(Resource):
         user_id = get_jwt_identity()
         data = request.json
         
-        # Get the active subscription
         subscription = UserSubscription.query.filter_by(
             user_id=user_id,
             status=SubscriptionStatus.ACTIVE.value
         ).first_or_404('No active subscription found')
         
-        # Get the new plan
         new_plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
-        
-        # Verify the plan is active
         if new_plan.status != PlanStatus.ACTIVE.value:
             return {'message': 'Cannot upgrade to inactive plan'}, 400
         
-        # Check if it's the same plan
         if subscription.plan_id == new_plan.id:
             return {'message': 'Already subscribed to this plan'}, 400
         
@@ -418,12 +387,10 @@ class SubscriptionUpgrade(Resource):
         # In a real system, we'd handle proration calculations here
         # For this example, we'll just update the subscription
         
-        # Log the change
         current_app.logger.info(
             f"Subscription change: User {user_id} changed from plan {subscription.plan_id} to {new_plan.id}"
         )
         
-        # Update the subscription
         subscription.plan_id = new_plan.id
         
         # If downgrading, we might keep the current period end
@@ -449,13 +416,11 @@ class SubscriptionCancel(Resource):
         user_id = get_jwt_identity()
         data = request.json
         
-        # Get the active subscription
         subscription = UserSubscription.query.filter_by(
             user_id=user_id,
             status=SubscriptionStatus.ACTIVE.value
         ).first_or_404('No active subscription found')
         
-        # Mark as canceled
         now = datetime.now(UTC)
         subscription.canceled_at = now
         
@@ -484,7 +449,6 @@ class ActiveSubscription(Resource):
         """Get the user's active subscription with plan details"""
         user_id = get_jwt_identity()
         
-        # Get the active subscription with plan details
         subscription = UserSubscription.query.filter_by(
             user_id=user_id,
             status=SubscriptionStatus.ACTIVE.value
@@ -516,22 +480,17 @@ class SubscriptionHistory(Resource):
         """Get user's subscription history with pagination and filtering"""
         user_id = get_jwt_identity()
         
-        # Get query parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         status = request.args.get('status')
         from_date_str = request.args.get('from_date')
         to_date_str = request.args.get('to_date')
         
-        # Build the query
         query = UserSubscription.query.filter_by(user_id=user_id)
-        
-        # Apply status filter if provided
         if status:
             statuses = status.split(',')
             query = query.filter(UserSubscription.status.in_(statuses))
         
-        # Apply date filters if provided
         if from_date_str:
             try:
                 from_date = datetime.fromisoformat(from_date_str)
@@ -546,10 +505,7 @@ class SubscriptionHistory(Resource):
             except ValueError:
                 pass  # Ignore invalid date format
         
-        # Order by created date descending (newest first)
         query = query.order_by(UserSubscription.created_at.desc())
-        
-        # Get paginated results
         pagination = query.paginate(page=page, per_page=per_page)
         
         return {
@@ -573,25 +529,17 @@ class IndefiniteSubscription(Resource):
     def post(self):
         """Create an indefinite subscription for a user (admin only)"""
         data = request.json
-        
-        # Check if plan ID and user ID are provided
         if 'plan_id' not in data:
             return {'message': 'Plan ID is required'}, 400
         
-        # Get the user ID from the token or request
         admin_id = get_jwt_identity()
         target_user_id = data.get('user_id')
         
         if not target_user_id:
             return {'message': 'User ID is required'}, 400
         
-        # Verify the plan exists and is active
         plan = SubscriptionPlan.query.get_or_404(data['plan_id'])
-        
-        # Verify the user exists
         user = User.query.get_or_404(target_user_id)
-        
-        # Check if user already has an active subscription
         active_subscription = UserSubscription.query.filter_by(
             user_id=target_user_id,
             status=SubscriptionStatus.ACTIVE.value
@@ -600,10 +548,7 @@ class IndefiniteSubscription(Resource):
         if active_subscription:
             return {'message': 'User already has an active subscription'}, 400
         
-        # Calculate dates
         now = datetime.now(UTC)
-        
-        # Create the indefinite subscription (no end date)
         subscription = UserSubscription(
             user_id=target_user_id,
             plan_id=plan.id,
@@ -619,8 +564,6 @@ class IndefiniteSubscription(Resource):
         
         db.session.add(subscription)
         db.session.commit()
-        
-        # Log the action
         current_app.logger.info(
             f"Indefinite subscription created: Admin {admin_id} created subscription for user {target_user_id} to plan {plan.id}"
         )

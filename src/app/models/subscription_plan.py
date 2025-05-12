@@ -2,13 +2,13 @@
 Subscription Plan model for managing available subscription plans.
 """
 import json
-from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from app import db
+
 from .base import BaseModel
 
 
@@ -58,7 +58,6 @@ class SubscriptionPlan(BaseModel):
     parent_id = db.Column(db.Integer, db.ForeignKey('subscription_plans.id'), nullable=True)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
     
-    # Relationships
     subscriptions = db.relationship('UserSubscription', back_populates='plan', lazy='dynamic')
     child_plans = db.relationship(
         'SubscriptionPlan',
@@ -68,10 +67,8 @@ class SubscriptionPlan(BaseModel):
     
     # Constraints and indexes
     __table_args__ = (
-        # Ensure plan name is unique within an interval type
         UniqueConstraint('name', 'interval', name='uix_plan_name_interval'),
         
-        # Indexes for common queries
         Index('idx_subscription_plan_status', 'status'),
         Index('idx_subscription_plan_price', 'price'),
         Index('idx_subscription_plan_parent', 'parent_id'),

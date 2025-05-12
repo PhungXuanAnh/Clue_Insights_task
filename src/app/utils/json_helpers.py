@@ -5,6 +5,7 @@ import decimal
 import json
 from datetime import date, datetime
 
+
 class CustomJSONEncoder(json.JSONEncoder):
     """
     Custom JSON encoder that can handle Decimal, datetime, and date types.

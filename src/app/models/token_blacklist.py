@@ -19,7 +19,6 @@ class TokenBlacklist(BaseModel):
     revoked_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC))
     expires_at = db.Column(db.DateTime, nullable=False)
     
-    # Relationship
     user = db.relationship('User', backref=db.backref('blacklisted_tokens', lazy='dynamic'))
     
     def __repr__(self):

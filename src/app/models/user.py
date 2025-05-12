@@ -1,9 +1,10 @@
 """
 User model for authentication and user management.
 """
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
+
 from .base import BaseModel
 
 
@@ -24,7 +25,6 @@ class User(BaseModel):
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     
-    # Relationships
     subscriptions = db.relationship('UserSubscription', back_populates='user', lazy='dynamic')
     
     def __init__(self, username, email, password, is_admin=False):

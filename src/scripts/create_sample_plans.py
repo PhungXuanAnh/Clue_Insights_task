@@ -10,7 +10,6 @@ def create_sample_plans():
     """Create sample subscription plans if they don't already exist."""
     print("Checking for existing plans...")
     
-    # Check if plans already exist to avoid duplicates
     existing_plans = SubscriptionPlan.query.filter(
         SubscriptionPlan.name.in_(["Free Plan", "Basic Plan", "Pro Plan", "Basic Plan (Annual)", "Pro Plan (Annual)"])
     ).all()
@@ -18,10 +17,8 @@ def create_sample_plans():
     existing_plan_names = [plan.name for plan in existing_plans]
     print(f"Found existing plans: {existing_plan_names}")
     
-    # Plan definitions
     plans_to_create = []
     
-    # Free Plan
     if "Free Plan" not in existing_plan_names:
         free_plan = SubscriptionPlan(
             name="Free Plan",
@@ -128,10 +125,7 @@ def create_sample_plans():
 
 if __name__ == "__main__":
     try:
-        # Create the Flask app with the development configuration
         app = create_app('development')
-        
-        # Push an application context
         with app.app_context():
             create_sample_plans()
             

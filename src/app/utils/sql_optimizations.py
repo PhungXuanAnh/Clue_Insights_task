@@ -3,14 +3,12 @@ Raw SQL optimizations for performance-critical database operations.
 
 This module contains optimized SQL queries for operations that benefit from bypassing the ORM.
 """
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Dict, List, Optional, Tuple, Union
 
-from flask import current_app
 from sqlalchemy import text
 
 from app import db
-from app.models.subscription_plan import PlanStatus
 from app.models.user_subscription import SubscriptionStatus
 
 
@@ -121,7 +119,6 @@ def get_user_active_subscription(user_id: int) -> Optional[Dict]:
             if key != 'plan_id':
                 del subscription[key]
     
-    # Add the plan dictionary to the subscription
     subscription['plan'] = plan
     subscription['plan_id'] = int(subscription['plan_id'])  # Ensure it's an integer
     
@@ -177,7 +174,6 @@ def get_subscription_history(
             where_clause += " AND s.status = :status"
             params["status"] = status
     
-    # Add date range filters if provided
     if from_date:
         where_clause += " AND s.created_at >= :from_date"
         params["from_date"] = from_date.isoformat()
@@ -208,8 +204,6 @@ def get_subscription_history(
     """)
     
     results = db.session.execute(sql, params).fetchall()
-    
-    # Get total count from the first row if results exist
     total = results[0].total_count if results else 0
     pages = (total + per_page - 1) // per_page if total > 0 else 0
     
@@ -220,7 +214,6 @@ def get_subscription_history(
         plan = {}
         
         for key, value in result._mapping.items():
-            # Skip the total_count column
             if key == 'total_count':
                 continue
                 
@@ -232,7 +225,6 @@ def get_subscription_history(
                 # Regular subscription field
                 subscription[key] = value
         
-        # Add the plan dictionary to the subscription
         subscription['plan'] = plan
         items.append(subscription)
     
@@ -281,8 +273,6 @@ def get_public_plans(
     """)
     
     results = db.session.execute(sql, params).fetchall()
-    
-    # Get total count from the first row if results exist
     total = results[0].total_count if results else 0
     pages = (total + per_page - 1) // per_page if total > 0 else 0
     
@@ -290,7 +280,6 @@ def get_public_plans(
     for result in results:
         plan = {}
         for key, value in result._mapping.items():
-            # Skip the total_count column
             if key == 'total_count':
                 continue
             plan[key] = value

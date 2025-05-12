@@ -3,16 +3,14 @@ Subscription Management API Application Factory.
 """
 import importlib
 import os
-from datetime import datetime
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, make_response, render_template, render_template_string, request
-from flask_jwt_extended import JWTManager, get_jwt
+from flask import Flask, jsonify, make_response, render_template_string, request
+from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_restx import Api
 from flask_sqlalchemy import SQLAlchemy
 
-# Initialize extensions
 db = SQLAlchemy()
 jwt = JWTManager()
 migrate = Migrate()
@@ -27,22 +25,15 @@ def create_app(config_name=None):
     Returns:
         Flask application instance.
     """
-    # Load environment variables
     load_dotenv()
-    
-    # Create Flask app
     app = Flask(__name__)
-    
-    # Configure the app
     app_config = os.getenv("FLASK_ENV", "development")
     if config_name:
         app_config = config_name
     
-    # Print debug information
     print(f"Using configuration: {app_config}")
     
     try:
-        # Map config_name to the proper module and class
         config_mapping = {
             'development': ('app.config.development_config', 'DevelopmentConfig'),
             'testing': ('app.config.testing_config', 'TestingConfig'),
@@ -66,7 +57,6 @@ def create_app(config_name=None):
         import traceback
         traceback.print_exc()
     
-    # Set default database URI based on environment if not already set
     if 'SQLALCHEMY_DATABASE_URI' not in app.config:
         if app_config == "development":
             app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://user:password@db:3306/subscription_dev_db"
@@ -76,20 +66,15 @@ def create_app(config_name=None):
             app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("SQLALCHEMY_DATABASE_URI", 
                                    "mysql+pymysql://user:password@db:3306/subscription_db")
     
-    # Make sure DEBUG and TESTING values are set properly
     print(f"DEBUG setting: {app.config.get('DEBUG')}")
     print(f"TESTING setting: {app.config.get('TESTING')}")
-    
-    # Print final database URI after config is loaded
     print(f"Final Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
     
-    # Initialize extensions with app
     db.init_app(app)
     jwt.init_app(app)
     
     # Configure JWT token blacklist if enabled
     if app.config.get('JWT_BLACKLIST_ENABLED'):
-        # Import token blacklist model
         from app.models.token_blacklist import TokenBlacklist
         
         @jwt.token_in_blocklist_loader
@@ -110,12 +95,10 @@ def create_app(config_name=None):
                 'message': 'Token has been revoked'
             }), 401
     
-    # Initialize Flask-Migrate with app and database
     migrate.init_app(app, db)
     
     # Import models to ensure they're registered with SQLAlchemy
-    from app.models import (SubscriptionPlan, TokenBlacklist, User,
-                            UserSubscription)
+    from app.models import SubscriptionPlan, TokenBlacklist, User, UserSubscription
 
     # Create API with additional configuration for Swagger UI documentation
     api = Api(
@@ -136,14 +119,16 @@ def create_app(config_name=None):
     )
     
     # Register blueprints and namespaces here
-    from app.api.v1.subscriptions import plan_ns, subscription_ns
     from app.api.v1.auth import auth_ns as auth_ns_v1
-    
+    from app.api.v1.subscriptions import plan_ns, subscription_ns
+
     # Import v2 namespaces
-    from app.api.v2.subscriptions import plan_ns as plan_ns_v2, subscription_ns as subscription_ns_v2
-    
+    from app.api.v2.subscriptions import plan_ns as plan_ns_v2
+    from app.api.v2.subscriptions import subscription_ns as subscription_ns_v2
+
     # Import v3 namespaces (optimized JOIN operations)
-    from app.api.v3.subscriptions import plan_ns as plan_ns_v3, subscription_ns as subscription_ns_v3
+    from app.api.v3.subscriptions import plan_ns as plan_ns_v3
+    from app.api.v3.subscriptions import subscription_ns as subscription_ns_v3
 
     # Register namespaces with API versioning (v1)
     api.add_namespace(auth_ns_v1, path='/api/v1/auth')
@@ -158,7 +143,6 @@ def create_app(config_name=None):
     api.add_namespace(plan_ns_v3, path='/api/v3/plans')
     api.add_namespace(subscription_ns_v3, path='/api/v3/subscriptions')
     
-    # Create a health check route
     @app.route('/health')
     def health_check():
         """Health check endpoint to verify the application is running."""
@@ -179,7 +163,6 @@ def create_app(config_name=None):
             print(f"Database connection error: {str(e)}")
             return False
     
-    # Shell context processor
     @app.shell_context_processor
     def shell_context():
         return {"app": app, "db": db}
@@ -234,13 +217,10 @@ def create_app(config_name=None):
         # Now initialize the Flask-DebugToolbar
         try:
             from flask_debugtoolbar import DebugToolbarExtension
-            
-            # Configure Flask-DebugToolbar
             app.config['DEBUG_TB_ENABLED'] = True
             app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
             app.config['DEBUG_TB_PROFILER_ENABLED'] = True
             
-            # Initialize the extension
             with app.app_context():
                 DebugToolbarExtension(app)
                 print("Flask-DebugToolbar initialized in development mode")

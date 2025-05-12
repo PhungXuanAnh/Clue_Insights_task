@@ -1,15 +1,12 @@
 """
 V2 subscription routes that use optimized raw SQL queries for better performance.
 """
-# Standard library imports
 from datetime import datetime
 
-# Third-party imports 
 from flask import request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource, fields, reqparse
 
-# Application imports
 from app.api.v2.subscriptions import plan_ns, subscription_ns
 from app.utils.json_helpers import convert_decimal_in_dict
 from app.utils.sql_optimizations import (
@@ -20,7 +17,6 @@ from app.utils.sql_optimizations import (
     get_user_active_subscription,
 )
 
-# Models for documentation and request/response parsing
 subscription_model = subscription_ns.model(
     "Subscription",
     {
@@ -109,7 +105,6 @@ expiring_parser.add_argument(
 )
 
 
-# Subscription routes
 @subscription_ns.route("/active")
 class ActiveSubscription(Resource):
     """Get the current user's active subscription"""
@@ -120,14 +115,11 @@ class ActiveSubscription(Resource):
     def get(self):
         """Get the current user's active subscription using optimized SQL"""
         current_user_id = get_jwt_identity()
-
-        # Use the optimized SQL function
         subscription = get_user_active_subscription(current_user_id)
 
         if not subscription:
             subscription_ns.abort(404, "No active subscription found")
 
-        # Convert Decimal to float
         subscription = convert_decimal_in_dict(subscription)
         return subscription
 
@@ -144,10 +136,8 @@ class SubscriptionHistory(Resource):
         current_user_id = get_jwt_identity()
         args = subscription_history_parser.parse_args()
 
-        # Process date parameters if provided
         from_date = None
         to_date = None
-
         if args.get("from_date"):
             try:
                 from_date = datetime.fromisoformat(args["from_date"])
@@ -160,7 +150,6 @@ class SubscriptionHistory(Resource):
             except ValueError:
                 subscription_ns.abort(400, "Invalid to_date format. Use YYYY-MM-DD")
 
-        # Use the optimized SQL function
         items, total, page, per_page, pages = get_subscription_history(
             current_user_id,
             status=args.get("status"),
@@ -170,10 +159,7 @@ class SubscriptionHistory(Resource):
             per_page=args.get("per_page", 10),
         )
 
-        # Convert Decimal to float
         items = convert_decimal_in_dict(items)
-
-        # Return in the same format as v1 API for consistency
         return {
             "subscriptions": items,
             "total": total,
@@ -206,13 +192,8 @@ class ExpiringSubscriptions(Resource):
         args = expiring_parser.parse_args()
         days = args.get("days", 7)
 
-        # Use the optimized SQL function
         subscriptions = get_expiring_subscriptions(days)
-
-        # Convert Decimal to float
         subscriptions = convert_decimal_in_dict(subscriptions)
-
-        # Return in the same format as v1 API for consistency
         return {"subscriptions": subscriptions, "total": len(subscriptions)}
 
 
@@ -235,14 +216,11 @@ class SubscriptionStats(Resource):
 
         if not is_admin:
             subscription_ns.abort(403, "Admin access required")
-
-        # Use the optimized SQL function
         stats = get_subscription_stats()
 
         return stats
 
 
-# Plan routes
 @plan_ns.route("/")
 class PlanList(Resource):
     """List all public subscription plans"""
@@ -252,18 +230,13 @@ class PlanList(Resource):
     def get(self):
         """Get public subscription plans using optimized SQL"""
         args = plan_list_parser.parse_args()
-
-        # Use the optimized SQL function
         items, total, page, per_page, pages = get_public_plans(
             status=args.get("status"),
             page=args.get("page", 1),
             per_page=args.get("per_page", 10),
         )
 
-        # Convert Decimal to float
         items = convert_decimal_in_dict(items)
-
-        # Return in the same format as v1 API for consistency
         return {
             "plans": items,
             "total": total,

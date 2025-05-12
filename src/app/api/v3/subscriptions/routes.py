@@ -1,17 +1,14 @@
 """
 Routes for subscription plans and user subscriptions (V3 API) with optimized JOIN operations.
 """
-# Standard library imports
 import json
 from datetime import UTC, datetime, timedelta
 
-# Third-party imports
 from flask import current_app, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Resource, fields
 from sqlalchemy.orm import contains_eager, joinedload, load_only
 
-# Application imports
 from app import db
 from app.api.v1.subscriptions.routes import (
     cancel_subscription_model,
@@ -44,9 +41,6 @@ from . import plan_ns, subscription_ns
 subscription_cache = {}
 CACHE_TTL = 300  # 5 minutes in seconds
 
-# --- PAGINATED LIST CACHE ---
-from functools import wraps
-
 # Cache for paginated plan lists
 plan_list_cache = {}
 # Cache for paginated subscription history per user
@@ -54,16 +48,16 @@ subscription_history_cache = {}
 
 PAGINATED_CACHE_TTL = 300  # 5 minutes
 
-# Helper to build cache key for plans
 def build_plan_list_cache_key(page, per_page, status, public_only):
+    """Helper to build cache key for plans"""
     return f"page={page}|per_page={per_page}|status={status}|public_only={public_only}"
 
-# Helper to build cache key for subscription history
 def build_subscription_history_cache_key(user_id, page, per_page, status, from_date, to_date):
+    """Helper to build cache key for subscription history"""
     return f"user={user_id}|page={page}|per_page={per_page}|status={status}|from={from_date}|to={to_date}"
 
-# Cache get/set/invalidate for plans
 def get_cached_plan_list(key):
+    """Cache get/set/invalidate for plans"""
     entry = plan_list_cache.get(key)
     if entry and entry['expires_at'] > datetime.now(UTC).timestamp():
         return entry['data']
@@ -72,16 +66,18 @@ def get_cached_plan_list(key):
     return None
 
 def set_cached_plan_list(key, data):
+    """Cache set for plans"""
     plan_list_cache[key] = {
         'data': data,
         'expires_at': datetime.now(UTC).timestamp() + PAGINATED_CACHE_TTL
     }
 
 def invalidate_plan_list_cache():
+    """Invalidate plan list cache"""
     plan_list_cache.clear()
 
-# Cache get/set/invalidate for subscription history
 def get_cached_subscription_history(key):
+    """Cache get/set/invalidate for subscription history"""
     entry = subscription_history_cache.get(key)
     if entry and entry['expires_at'] > datetime.now(UTC).timestamp():
         return entry['data']
@@ -124,7 +120,6 @@ def invalidate_subscription_cache(user_id):
     if user_id in subscription_cache:
         del subscription_cache[user_id]
 
-# Define our own plan model that explicitly converts price to float
 plan_model = plan_ns.model('SubscriptionPlan', {
     'id': fields.Integer(description='Plan ID'),
     'name': fields.String(required=True, description='Plan name'),
@@ -145,7 +140,6 @@ plan_model = plan_ns.model('SubscriptionPlan', {
     'updated_at': fields.DateTime(description='Last update date'),
 })
 
-# Also define our own subscription_with_plan_model to use our updated plan_model
 subscription_with_plan_model = subscription_ns.model('UserSubscriptionWithPlan', {
     'id': fields.Integer(description='Subscription ID'),
     'user_id': fields.Integer(description='User ID'),
@@ -167,7 +161,6 @@ subscription_with_plan_model = subscription_ns.model('UserSubscriptionWithPlan',
     'plan': fields.Nested(plan_model, description='Subscription plan details')
 })
 
-# API routes for subscription plans
 @plan_ns.route('/')
 class SubscriptionPlanList(Resource):
     """Resource for listing and creating subscription plans"""
@@ -184,7 +177,6 @@ class SubscriptionPlanList(Resource):
         # Clear cache in test mode to avoid test pollution
         if current_app.config.get('TESTING'):
             invalidate_plan_list_cache()
-        # Get query parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         status = request.args.get('status')
@@ -208,12 +200,10 @@ class SubscriptionPlanList(Resource):
                 SubscriptionPlan.updated_at
             )
         )
-        # Apply filters
         if status:
             query = query.filter(SubscriptionPlan.status == status)
         if public_only:
             query = query.filter(SubscriptionPlan.is_public == True)
-        # Get paginated results, loading only essential fields
         pagination = query.order_by(SubscriptionPlan.sort_order).paginate(
             page=page, per_page=per_page
         )
@@ -237,14 +227,12 @@ class SubscriptionPlanList(Resource):
         """Create a new subscription plan (admin only)"""
         data = request.json
         
-        # Handle features as dict
         features = data.get('features')
         if features and isinstance(features, dict):
             features_json = json.dumps(features)
         else:
             features_json = features
             
-        # Create new plan instance
         plan = SubscriptionPlan(
             name=data['name'],
             description=data['description'],
@@ -297,7 +285,6 @@ class SubscriptionPlanResource(Resource):
         data = request.json
         plan = SubscriptionPlan.query.get_or_404(id)
         
-        # Update plan attributes
         plan.name = data.get('name', plan.name)
         plan.description = data.get('description', plan.description)
         plan.price = data.get('price', plan.price)
@@ -309,7 +296,6 @@ class SubscriptionPlanResource(Resource):
         plan.parent_id = data.get('parent_id', plan.parent_id)
         plan.sort_order = data.get('sort_order', plan.sort_order)
         
-        # Handle features dict
         features = data.get('features')
         if features:
             if isinstance(features, dict):
@@ -383,7 +369,6 @@ class UserSubscriptionList(Resource):
         user_id = get_jwt_identity()
         data = request.json
         
-        # Check if plan exists and is active
         plan = SubscriptionPlan.query.options(
             load_only(SubscriptionPlan.id, SubscriptionPlan.name, 
                      SubscriptionPlan.status, SubscriptionPlan.duration_months)
@@ -392,7 +377,6 @@ class UserSubscriptionList(Resource):
             SubscriptionPlan.status == PlanStatus.ACTIVE.value
         ).first_or_404('Plan not found or is not active')
         
-        # Optimize query to check for active subscriptions
         active_subscription = UserSubscription.query.filter(
             UserSubscription.user_id == user_id,
             UserSubscription.status == SubscriptionStatus.ACTIVE.value
@@ -401,7 +385,6 @@ class UserSubscriptionList(Resource):
         if active_subscription:
             return {'message': 'User already has an active subscription'}, 400
             
-        # Calculate dates
         now = datetime.now(UTC)
         trial_days = data.get('trial_days', 0)
         
@@ -412,7 +395,6 @@ class UserSubscriptionList(Resource):
             current_period_end = now + timedelta(days=30 * plan.duration_months)
             status = SubscriptionStatus.ACTIVE.value
             
-        # Create new subscription with optimized query
         subscription = UserSubscription(
             user_id=user_id,
             plan_id=plan.id,
@@ -427,10 +409,8 @@ class UserSubscriptionList(Resource):
         db.session.add(subscription)
         db.session.commit()
         
-        # Invalidate cache for this user
         invalidate_subscription_cache(user_id)
         
-        # Load with plan details for response
         subscription_with_plan = db.session.get(UserSubscription, subscription.id, options=[
             joinedload(UserSubscription.plan)
         ])
@@ -475,7 +455,6 @@ class SubscriptionUpgrade(Resource):
             SubscriptionPlan.status == PlanStatus.ACTIVE.value
         ).first_or_404('Plan not found or is not active')
         
-        # Check if plan is the same
         if active_subscription.plan_id == new_plan.id:
             return {'message': 'Already subscribed to this plan'}, 400
             
@@ -483,12 +462,10 @@ class SubscriptionUpgrade(Resource):
         prorate = data.get('prorate', True)
         now = datetime.now(UTC)
         
-        # Log the change
         current_app.logger.info(
             f"Subscription change: User {user_id} changed from plan {active_subscription.plan_id} to {new_plan.id}"
         )
         
-        # Directly update the existing subscription to match v1 behavior
         active_subscription.plan_id = new_plan.id
         
         # In a real system, we'd handle proration calculations here
@@ -496,7 +473,6 @@ class SubscriptionUpgrade(Resource):
         
         db.session.commit()
         
-        # Invalidate cache
         invalidate_subscription_cache(user_id)
         invalidate_subscription_history_cache(user_id)
         
@@ -540,7 +516,6 @@ class SubscriptionCancel(Resource):
             
         db.session.commit()
         
-        # Invalidate cache
         invalidate_subscription_cache(user_id)
         invalidate_subscription_history_cache(user_id)
         
@@ -559,7 +534,6 @@ class ActiveSubscription(Resource):
         """Get the current active subscription with plan details"""
         user_id = get_jwt_identity()
         
-        # Try to get from cache first
         cached_subscription = get_cached_active_subscription(user_id)
         if cached_subscription:
             return cached_subscription
@@ -577,7 +551,6 @@ class ActiveSubscription(Resource):
             UserSubscription.status == SubscriptionStatus.ACTIVE.value
         ).first_or_404('No active subscription found')
         
-        # Cache the result
         cache_active_subscription(user_id, subscription)
         
         return subscription
@@ -621,7 +594,6 @@ class SubscriptionHistory(Resource):
             contains_eager(UserSubscription.plan)
         ).filter(UserSubscription.user_id == user_id)
         
-        # Apply filters
         if status:
             statuses = status.split(',')
             query = query.filter(UserSubscription.status.in_(statuses))
@@ -640,10 +612,7 @@ class SubscriptionHistory(Resource):
             except ValueError:
                 pass
                 
-        # Order by most recent first
         query = query.order_by(UserSubscription.created_at.desc())
-        
-        # Paginate results
         pagination = query.paginate(page=page, per_page=per_page)
         
         result = {
@@ -670,33 +639,27 @@ class IndefiniteSubscription(Resource):
     def post(self):
         """Create an indefinite subscription for a user (admin only)"""
         data = request.json
-        
-        # Validate required fields
         if 'user_id' not in data:
             return {'message': 'User ID is required'}, 400
             
         if 'plan_id' not in data:
             return {'message': 'Plan ID is required'}, 400
             
-        # Get the user and plan
         user = User.query.get_or_404(data['user_id'], 'User not found')
         plan = SubscriptionPlan.query.get_or_404(data['plan_id'], 'Plan not found')
         
-        # Check for existing active subscription
         existing = UserSubscription.query.filter(
             UserSubscription.user_id == user.id,
             UserSubscription.status == SubscriptionStatus.ACTIVE.value
         ).first()
         
         if existing:
-            # Cancel existing subscription
             existing.status = SubscriptionStatus.CANCELED.value
             existing.canceled_at = datetime.now(UTC)
             existing.end_date = datetime.now(UTC)
             
         # Create new subscription with indefinite duration
         now = datetime.now(UTC)
-        # Set end date to very far in the future (effectively indefinite)
         far_future = now + timedelta(days=365 * 100)  # 100 years
         
         subscription = UserSubscription(
@@ -714,10 +677,8 @@ class IndefiniteSubscription(Resource):
         db.session.add(subscription)
         db.session.commit()
         
-        # Invalidate cache
         invalidate_subscription_cache(user.id)
         
-        # Load with plan details for response
         subscription_with_plan = UserSubscription.query.options(
             joinedload(UserSubscription.plan)
         ).get(subscription.id)

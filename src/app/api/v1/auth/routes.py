@@ -20,20 +20,17 @@ from app.models.user import User
 
 from . import auth_ns
 
-# Define the user registration model for documentation and validation
 register_model = auth_ns.model('UserRegistration', {
     'username': fields.String(required=True, description='User username'),
     'email': fields.String(required=True, description='User email address'),
     'password': fields.String(required=True, description='User password')
 })
 
-# Define the login model for documentation and validation
 login_model = auth_ns.model('UserLogin', {
     'username': fields.String(required=True, description='User username or email'),
     'password': fields.String(required=True, description='User password')
 })
 
-# Define the token response model for documentation
 token_model = auth_ns.model('TokenResponse', {
     'access_token': fields.String(description='JWT access token'),
     'refresh_token': fields.String(description='JWT refresh token'),
@@ -42,7 +39,6 @@ token_model = auth_ns.model('TokenResponse', {
     'is_admin': fields.Boolean(description='Whether the user has admin privileges')
 })
 
-# Define the user response model for documentation
 user_model = auth_ns.model('User', {
     'id': fields.Integer(description='User identifier'),
     'username': fields.String(description='User username'),
@@ -52,12 +48,10 @@ user_model = auth_ns.model('User', {
     'updated_at': fields.DateTime(description='Last update timestamp')
 })
 
-# Define the refresh token model for documentation
 refresh_token_model = auth_ns.model('RefreshToken', {
     'access_token': fields.String(description='New JWT access token')
 })
 
-# Define the logout response model for documentation
 logout_model = auth_ns.model('LogoutResponse', {
     'message': fields.String(description='Logout success message')
 })
@@ -91,18 +85,13 @@ class UserRegistration(Resource):
             return {'message': 'Password must be at least 6 characters long'}, 400
             
         try:
-            # Create new user
             user = User(
                 username=data['username'],
                 email=data['email'],
                 password=data['password']
             )
-            
-            # Add user to database
             db.session.add(user)
             db.session.commit()
-            
-            # Return user information (excluding password)
             return {
                 'id': user.id,
                 'username': user.username,
@@ -133,17 +122,13 @@ class UserLogin(Resource):
         Authenticate a user and generate JWT tokens.
         """
         data = request.json
-        
-        # Validate required fields
         if not all(k in data for k in ('username', 'password')):
             return {'message': 'Missing required fields'}, 400
             
-        # Find user by username or email
         user = User.query.filter(
             (User.username == data['username']) | (User.email == data['username'])
         ).first()
         
-        # Check if user exists and password is correct
         if not user or not user.check_password(data['password']):
             return {'message': 'Invalid username/email or password'}, 401
             
@@ -161,7 +146,6 @@ class UserLogin(Resource):
             additional_claims=additional_claims
         )
         
-        # Return tokens and user info
         return {
             'access_token': access_token,
             'refresh_token': refresh_token,
@@ -183,13 +167,8 @@ class TokenRefresh(Resource):
         """
         Generate a new access token using a refresh token.
         """
-        # Get the identity from the refresh token
         current_user = get_jwt_identity()
-        
-        # Generate a new access token with the same claims
         new_access_token = create_access_token(identity=current_user)
-        
-        # Return the new access token
         return {
             'access_token': new_access_token
         }, 200
@@ -207,20 +186,16 @@ class UserLogout(Resource):
         """
         Revoke the current JWT token.
         """
-        # Check if blacklist is enabled
         if not current_app.config.get('JWT_BLACKLIST_ENABLED', False):
             return {'message': 'Logout successful'}, 200
             
-        # Get JWT metadata
         token_data = get_jwt()
         jti = token_data['jti']
         token_type = "access"
         user_id = get_jwt_identity()
         
-        # Calculate expiration time
         expires_at = datetime.fromtimestamp(token_data['exp'])
         
-        # Add token to blacklist
         try:
             TokenBlacklist.add_token_to_blacklist(
                 jti=jti,

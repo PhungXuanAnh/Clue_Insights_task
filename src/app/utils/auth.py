@@ -3,7 +3,6 @@ Authentication utilities and decorators.
 """
 from functools import wraps
 
-from flask import jsonify
 from flask_jwt_extended import get_jwt
 
 
@@ -18,10 +17,7 @@ def admin_required():
     def wrapper(fn):
         @wraps(fn)
         def decorator(*args, **kwargs):
-            # Get JWT claims directly from the token
             claims = get_jwt()
-            
-            # Check for admin privileges in the additional claims
             is_admin = claims.get('is_admin', False)
             
             if not is_admin:
