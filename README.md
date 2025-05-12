@@ -76,7 +76,7 @@ The v2 API improves performance over v1 by:
 - **JSON Serialization Optimizations**: Efficient handling of date/time and decimal types
 
 ### 1.2.3. API v3
-Highly optimized API v1 with the following performance enhancements:
+Highly optimized of API v1 with the following performance enhancements (in case you want to stick with ORM):
 - In-memory caching for active subscriptions
 - Optimized JOIN operations for subscription-related queries
 - Selective column loading for reduced data transfer
